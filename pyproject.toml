@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "btc-daily-report"
+version = "0.1.0"
+description = "Daily BTC email reports from free public sources"
+requires-python = ">=3.11"
+dependencies = [
+  "feedparser>=6.0.11",
+  "httpx>=0.28.0",
+  "beautifulsoup4>=4.13.0",
+  "lxml>=5.3.0",
+  "matplotlib>=3.10.0",
+  "mplfinance>=0.12.10b0",
+  "pandas>=2.2.0",
+  "python-dotenv>=1.1.0",
+  "PyYAML>=6.0.2",
+  "Jinja2>=3.1.0",
+  "resend>=2.0.0",
+  "tenacity>=9.0.0",
+]
+
+[project.scripts]
+btc-report = "btc_report.runner:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+btc_report = ["templates/*.html"]

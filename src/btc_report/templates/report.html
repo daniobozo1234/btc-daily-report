@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ titles }}</title>
+  <style>
+    body { font-family: Georgia, 'Times New Roman', serif; color: #1a1a1a; background: #f6f4ef; margin: 0; padding: 0; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 1.45rem; margin: 0 0 8px; }
+    h2 { font-size: 1.15rem; margin: 28px 0 10px; border-bottom: 1px solid #d8d2c4; padding-bottom: 6px; }
+    h3 { font-size: 1rem; margin: 16px 0 8px; }
+    .muted { color: #666; font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+    .kpi { background: #fff; border: 1px solid #e4dece; padding: 10px 12px; }
+    .kpi b { display: block; font-size: 1.05rem; }
+    .kpi span { font-size: 0.8rem; color: #666; }
+    ul { padding-left: 1.1rem; }
+    li { margin: 0.7rem 0; }
+    a { color: #0b5fff; }
+    img.chart { width: 100%; height: auto; border: 1px solid #e4dece; background: #fff; }
+    .btn { display: inline-block; margin: 8px 8px 8px 0; padding: 10px 14px; background: #111; color: #fff !important; text-decoration: none; }
+    .src { font-size: 0.85rem; color: #444; }
+    .article-title { font-weight: bold; }
+    .article-sum { display: block; margin-top: 6px; color: #222; font-size: 0.98rem; line-height: 1.45; }
+    .note { background: #fff8e7; border: 1px solid #e6d9b0; padding: 10px 12px; font-size: 0.9rem; }
+    .pill { display: inline-block; background: #eee; padding: 3px 9px; margin: 2px 4px 2px 0; border-radius: 4px; font-size: 0.85rem; }
+    .outlook { background: #fff; border: 1px solid #e4dece; padding: 14px 16px; margin: 12px 0; }
+    .outlook h3 { margin-top: 0; }
+    .thread { margin: 0.6rem 0 1rem; }
+    .thread .label { font-weight: bold; }
+    .trend-up { color: #1a7f37; font-weight: bold; }
+    .trend-down { color: #c62828; font-weight: bold; }
+    .trend-side { color: #8a6d3b; font-weight: bold; }
+    #tv-widget, #tv-widget-eth { width: 100%; height: 520px; background: #fff; border: 1px solid #e4dece; }
+    table.top10 { font-size: 0.85rem; }
+    table.top10 td.num { text-align: right; white-space: nowrap; }
+    table.etf { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: #fff; }
+    table.etf th, table.etf td { border: 1px solid #e4dece; padding: 6px 8px; text-align: left; }
+    .pos { color: #1a7f37; } .neg { color: #c62828; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>{{ titles }}</h1>
+    <p class="muted">Wygenerowano: {{ generated_at }} · <a href="archiwum.html">archiwum dni</a></p>
+
+    {% if analysis.ai_enabled %}
+    <p class="muted">AI: {{ analysis.ai_provider or 'ok' }} / {{ analysis.ai_model or '' }}</p>
+    {% else %}
+    <p class="note">AI niepełne — sprawdź GROQ_API_KEY / limity.{% if analysis.error %}<br />{{ analysis.error }}{% endif %}</p>
+    {% endif %}
+
+    <h2>Cena i kursy</h2>
+    <h3>Bitcoin (BTC)</h3>
+    <div class="grid">
+      <div class="kpi"><span>BTC / USD</span><b>{{ fmt_num(market.btc_usd) }}</b></div>
+      <div class="kpi"><span>BTC / EUR</span><b>{{ fmt_num(market.btc_eur) }}</b></div>
+      <div class="kpi"><span>BTC / PLN</span><b>{{ fmt_num(market.btc_pln) }}</b></div>
+      <div class="kpi"><span>USD/PLN (NBP)</span><b>{{ fmt_num(market.usd_pln, 4) }}</b></div>
+      <div class="kpi"><span>EUR/PLN (NBP)</span><b>{{ fmt_num(market.eur_pln, 4) }}</b></div>
+    </div>
+    <p class="muted" style="margin-top:12px">Zmiana <b>ceny BTC względem USD</b>:</p>
+    <div class="grid">
+      <div class="kpi"><span>BTC vs USD — 24h</span><b>{{ fmt_pct(market.change_24h_pct) }}</b></div>
+      <div class="kpi"><span>BTC vs USD — 7 dni</span><b>{{ fmt_pct(market.change_7d_pct) }}</b></div>
+      <div class="kpi"><span>BTC vs USD — 30 dni</span><b>{{ fmt_pct(market.change_30d_pct) }}</b></div>
+    </div>
+
+    <h3>Ethereum (ETH)</h3>
+    <div class="grid">
+      <div class="kpi"><span>ETH / USD</span><b>{{ fmt_num(market.eth_usd) }}</b></div>
+      <div class="kpi"><span>ETH / EUR</span><b>{{ fmt_num(market.eth_eur) }}</b></div>
+      <div class="kpi"><span>ETH / PLN</span><b>{{ fmt_num(market.eth_pln) }}</b></div>
+    </div>
+    <p class="muted" style="margin-top:12px">Zmiana <b>ceny ETH względem USD</b>:</p>
+    <div class="grid">
+      <div class="kpi"><span>ETH vs USD — 24h</span><b>{{ fmt_pct(market.eth_change_24h_pct) }}</b></div>
+      <div class="kpi"><span>ETH vs USD — 7 dni</span><b>{{ fmt_pct(market.eth_change_7d_pct) }}</b></div>
+      <div class="kpi"><span>ETH vs USD — 30 dni</span><b>{{ fmt_pct(market.eth_change_30d_pct) }}</b></div>
+    </div>
+
+    <h2>Wskaźniki</h2>
+    <h3>Wspólne / makro</h3>
+    <div class="grid">
+      <div class="kpi"><span>Fear &amp; Greed</span><b>{{ market.fear_greed or '—' }} {% if market.fear_greed_label %}({{ market.fear_greed_label }}){% endif %}</b></div>
+      <div class="kpi"><span>US 10Y</span><b>{% if market.us10y_yield %}{{ fmt_num(market.us10y_yield, 2) }}%{% else %}—{% endif %}</b></div>
+      <div class="kpi"><span>Hashrate BTC</span><b>{% if market.hashrate_eh_s %}{{ fmt_num(market.hashrate_eh_s, 2) }} EH/s{% else %}—{% endif %}</b></div>
+      <div class="kpi"><span>Halving — bloki pozostałe</span><b>{% if market.halving_blocks_remaining is not none %}{{ market.halving_blocks_remaining }}{% else %}—{% endif %}</b></div>
+      <div class="kpi"><span>Halving — ok. dni / data</span><b>{% if market.halving_eta_days is not none %}{{ fmt_num(market.halving_eta_days, 0) }} dni · {{ market.halving_eta_date }}{% else %}—{% endif %}</b></div>
+    </div>
+    {% if market.halving_note %}<p class="src">{{ market.halving_note }}</p>{% endif %}
+
+    <h3>Bitcoin</h3>
+    <div class="grid">
+      <div class="kpi"><span>Volume 24h (USD)</span><b>{{ fmt_num(market.volume_24h_usd, 0) }}</b></div>
+      <div class="kpi"><span>Market cap (USD)</span><b>{{ fmt_num(market.market_cap_usd, 0) }}</b></div>
+      <div class="kpi"><span>Dominacja BTC</span><b>{{ fmt_num(market.btc_dominance_pct) }}%</b></div>
+    </div>
+
+    <h3>Ethereum</h3>
+    <div class="grid">
+      <div class="kpi"><span>Volume 24h (USD)</span><b>{{ fmt_num(market.eth_volume_24h_usd, 0) }}</b></div>
+      <div class="kpi"><span>Market cap (USD)</span><b>{{ fmt_num(market.eth_market_cap_usd, 0) }}</b></div>
+      <div class="kpi"><span>Dominacja ETH</span><b>{{ fmt_num(market.eth_dominance_pct) }}%</b></div>
+    </div>
+
+    {% if market.top_coins %}
+    <h2>Top 10 kryptowalut (CoinGecko)</h2>
+    <p class="muted">Ranking wg kapitalizacji rynkowej — cena, zmiany 24h/7d, market cap, wolumen (jak na CoinGecko).</p>
+    <table class="etf top10">
+      <tr>
+        <th>#</th><th>Nazwa</th><th>Cena USD</th><th>24h</th><th>7d</th><th>Market cap</th><th>Vol 24h</th>
+      </tr>
+      {% for c in market.top_coins %}
+      <tr>
+        <td>{{ c.rank or loop.index }}</td>
+        <td><b>{{ c.symbol }}</b> · {{ c.name }}</td>
+        <td class="num">{{ fmt_num(c.price_usd) }}</td>
+        <td class="num {{ 'pos' if (c.change_24h_pct or 0) >= 0 else 'neg' }}">{{ fmt_pct(c.change_24h_pct) }}</td>
+        <td class="num {{ 'pos' if (c.change_7d_pct or 0) >= 0 else 'neg' }}">{{ fmt_pct(c.change_7d_pct) }}</td>
+        <td class="num">{{ fmt_num(c.market_cap_usd, 0) }}</td>
+        <td class="num">{{ fmt_num(c.volume_24h_usd, 0) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    <h2>ETF BTC — zakupy / sprzedaż</h2>
+    <p class="muted">Źródło aktualne: XOOMAR (holdings emitentów). Zielone = napływ, czerwone = odpływ. Wykres: dni + tygodnie.</p>
+    {% if etf_chart_b64 %}
+    <img class="chart" alt="ETF flows" src="data:image/png;base64,{{ etf_chart_b64 }}" />
+    {% endif %}
+    {% if market.etf_breakdown %}
+    <h3>Rozbicie ostatniego dnia ({{ market.etf_latest_date }})</h3>
+    <table class="etf">
+      <tr><th>Ticker</th><th>Emitent</th><th>Flow (mln USD)</th></tr>
+      {% for b in market.etf_breakdown %}
+      <tr>
+        <td>{{ b.ticker }}</td>
+        <td>{{ b.issuer }}</td>
+        <td class="{{ 'pos' if b.flow_musd >= 0 else 'neg' }}">{{ '%+.2f'|format(b.flow_musd) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    <p class="src">{{ market.etf_flow_note or '' }}</p>
+
+    <h2>Duże ryby — netflow giełdowy BTC</h2>
+    <p class="muted">
+      Napływ BTC <b>na giełdy</b> często = większa podaż / presja sprzedaży.
+      Odpływ <b>z giełd</b> często = akumulacja / cold storage.
+      Główne źródło netflow: CryptoDataAPI (free). Opcjonalnie Whale Alert + duże tx z mempool.space.
+    </p>
+    <div class="grid">
+      <div class="kpi"><span>Net 1h</span><b>{% if whales.net_1h_btc is not none %}{{ '%+.1f'|format(whales.net_1h_btc) }} BTC{% else %}—{% endif %}</b></div>
+      <div class="kpi"><span>Net 24h</span><b>{% if whales.net_24h_btc is not none %}{{ '%+.1f'|format(whales.net_24h_btc) }} BTC{% else %}—{% endif %}</b></div>
+      <div class="kpi"><span>Net 7d</span><b>{% if whales.net_7d_btc is not none %}{{ '%+.1f'|format(whales.net_7d_btc) }} BTC{% else %}—{% endif %}</b></div>
+      <div class="kpi"><span>Inflow 24h</span><b>{% if whales.inflow_24h_btc is not none %}{{ fmt_num(whales.inflow_24h_btc, 1) }} BTC{% else %}—{% endif %}</b></div>
+      <div class="kpi"><span>Outflow 24h</span><b>{% if whales.outflow_24h_btc is not none %}{{ fmt_num(whales.outflow_24h_btc, 1) }} BTC{% else %}—{% endif %}</b></div>
+      <div class="kpi"><span>Bias 24h</span><b>{{ whales.bias_24h or '—' }}</b></div>
+    </div>
+    {% if whale_chart_b64 %}
+    <img class="chart" alt="Whale netflow" src="data:image/png;base64,{{ whale_chart_b64 }}" />
+    {% endif %}
+    <p class="src">{{ whales.note or '' }} · Bias 7d: {{ whales.bias_7d or '—' }}</p>
+    {% if whales.coverage_note %}<p class="muted">{{ whales.coverage_note }}</p>{% endif %}
+
+    {% if whales.per_exchange_24h %}
+    <h3>Netflow 24h wg giełdy (BTC) — tylko giełdy z danymi</h3>
+    <table class="etf">
+      <tr><th>Giełda</th><th>Inflow</th><th>Outflow</th><th>Net</th></tr>
+      {% for e in whales.per_exchange_24h if e.has_data %}
+      <tr>
+        <td><b>{{ e.exchange }}</b></td>
+        <td>{{ '%.1f'|format(e.inflow_btc) }}</td>
+        <td>{{ '%.1f'|format(e.outflow_btc) }}</td>
+        <td class="{{ 'neg' if e.net_btc > 0 else 'pos' }}">{{ '%+.1f'|format(e.net_btc) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% if whales.missing_exchanges %}
+    <p class="muted">Brak pokrycia BTC w free feed dla: {{ whales.missing_exchanges|join(', ') }} — nie interpretuj jako „0 ruchu”.</p>
+    {% endif %}
+    {% endif %}
+
+    {% if whales.whale_alert_txs %}
+    <h3>Whale Alert — duże transfery (ostatnia ~1h)</h3>
+    <p class="muted">Etykiety ownerów (exchange / unknown). Free tier Whale Alert: min. ~500k USD, historia ~1h.</p>
+    <table class="etf">
+      <tr><th>Kierunek</th><th>Z</th><th>Do</th><th>BTC</th><th>USD</th></tr>
+      {% for s in whales.whale_alert_txs %}
+      <tr>
+        <td class="{{ 'neg' if s.direction == 'inflow' else 'pos' }}">{{ s.direction }}</td>
+        <td>{{ s.from_owner }}</td>
+        <td>{{ s.to_owner }}</td>
+        <td>{{ '%.2f'|format(s.amount) }}</td>
+        <td>{{ fmt_num(s.amount_usd, 0) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if whales.recent_spikes %}
+    <h3>Większe spike’y BTC (netflow / alerty)</h3>
+    <table class="etf">
+      <tr><th>Kierunek</th><th>Giełda / etykieta</th><th>BTC</th><th>USD</th><th>Źródło</th></tr>
+      {% for s in whales.recent_spikes %}
+      <tr>
+        <td class="{{ 'neg' if s.direction == 'inflow' else 'pos' }}">{{ s.direction }}</td>
+        <td>{{ s.exchange }}</td>
+        <td>{{ '%.2f'|format(s.amount_btc or s.amount) }}</td>
+        <td>{% if s.amount_usd %}{{ fmt_num(s.amount_usd, 0) }}{% else %}—{% endif %}</td>
+        <td>{{ s.source or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if whales.large_onchain %}
+    <h3>Duże transakcje on-chain (mempool.space)</h3>
+    <p class="muted">Suma wyjść TX ≥ 80 BTC z ostatnich bloków. Bez etykiet giełd — to surowiec on-chain (może zawierać change / wewnętrzne przesunięcia).</p>
+    <table class="etf">
+      <tr><th>Blok</th><th>BTC</th><th>Tx</th></tr>
+      {% for t in whales.large_onchain %}
+      <tr>
+        <td>{{ t.block_height }}</td>
+        <td>{{ '%.1f'|format(t.amount_btc) }}</td>
+        <td>{% if t.url %}<a href="{{ t.url }}" target="_blank" rel="noopener">{{ t.txid_short }}…</a>{% else %}{{ t.txid_short }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if whales.related_spikes %}
+    <h3>Kontekst płynności — duże ruchy USDT/ETH na CEX</h3>
+    <p class="muted">Gdy feed BTC dla danej giełdy jest pusty, te alerty pokazują ruch płynności na innych assetach.</p>
+    <table class="etf">
+      <tr><th>Giełda</th><th>Asset</th><th>Kierunek</th><th>USD</th></tr>
+      {% for s in whales.related_spikes %}
+      <tr>
+        <td>{{ s.exchange }}</td>
+        <td>{{ s.symbol }}</td>
+        <td class="{{ 'neg' if s.direction == 'inflow' else 'pos' }}">{{ s.direction }}</td>
+        <td>{{ fmt_num(s.amount_usd, 0) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    <h2>Wykres BTC</h2>
+    <p class="muted">TradingView — okresy i wskaźniki przełączasz w widgetcie.</p>
+    <div id="tv-widget"></div>
+    <p>
+      <a class="btn" href="{{ tradingview_url }}" target="_blank" rel="noopener">Otwórz TradingView BTC</a>
+    </p>
+
+    <h2>Wykres ETH</h2>
+    <p class="muted">TradingView — okresy i wskaźniki przełączasz w widgetcie.</p>
+    <div id="tv-widget-eth"></div>
+    <p>
+      <a class="btn" href="{{ tradingview_eth_url }}" target="_blank" rel="noopener">Otwórz TradingView ETH</a>
+    </p>
+
+    <h2>Podsumowanie rynku AI</h2>
+    {% if analysis.tytul_dnia %}
+    <p><b>{{ analysis.tytul_dnia }}</b></p>
+    {% endif %}
+
+    {% if analysis.glowne_watki %}
+    <div class="outlook">
+      <h3>Główne wątki dnia</h3>
+      {% for w in analysis.glowne_watki %}
+      <div class="thread">
+        <div class="label">• {{ w.watek }}</div>
+        <div>{{ w.opis }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if analysis.trendy_rynku %}
+    <div class="outlook">
+      <h3>Trendy rynku</h3>
+      {% for t in analysis.trendy_rynku %}
+      <div class="thread">
+        <div>
+          <span class="label">{{ t.trend }}</span>
+          —
+          {% set d = (t.kierunek or '')|lower %}
+          <span class="{% if 'wzrost' in d %}trend-up{% elif 'spad' in d %}trend-down{% else %}trend-side{% endif %}">{{ t.kierunek }}</span>
+        </div>
+        <div>{{ t.opis }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if analysis.obraz_rynku %}
+    <div class="outlook">
+      <h3>Obraz rynku</h3>
+      <p>{{ analysis.obraz_rynku }}</p>
+    </div>
+    {% endif %}
+
+    {% if analysis.makro_a_btc %}
+    <div class="outlook">
+      <h3>Makro a Bitcoin</h3>
+      <p>{{ analysis.makro_a_btc }}</p>
+    </div>
+    {% endif %}
+
+    {% if analysis.wieloryby %}
+    <div class="outlook">
+      <h3>Wieloryby / przepływy giełdowe</h3>
+      <p>{{ analysis.wieloryby }}</p>
+    </div>
+    {% endif %}
+
+    {% if analysis.scenariusze_btc and (analysis.scenariusze_btc.bazowy or analysis.scenariusze_btc.optymistyczny or analysis.scenariusze_btc.pesymistyczny) %}
+    <div class="outlook">
+      <h3>Scenariusze zachowania BTC</h3>
+      <p class="muted">To scenariusze analityczne na podstawie newsów i wskaźników — nie rekomendacja inwestycyjna.</p>
+      {% if analysis.scenariusze_btc.bazowy %}
+      <p><b>Bazowy:</b> {{ analysis.scenariusze_btc.bazowy }}</p>
+      {% endif %}
+      {% if analysis.scenariusze_btc.optymistyczny %}
+      <p><b>Optymistyczny:</b> {{ analysis.scenariusze_btc.optymistyczny }}</p>
+      {% endif %}
+      {% if analysis.scenariusze_btc.pesymistyczny %}
+      <p><b>Pesymistyczny:</b> {{ analysis.scenariusze_btc.pesymistyczny }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if analysis.na_radarze %}
+    <h3>Na radarze</h3>
+    <p>{% for x in analysis.na_radarze %}<span class="pill">{{ x }}</span>{% endfor %}</p>
+    {% endif %}
+
+    {% if analysis.wnioski %}
+    <h3>Skrót wniosków</h3>
+    <ul>
+      {% for w in analysis.wnioski %}
+      <li><b>{{ w }}</b></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if analysis.ryzyka %}
+    <h3>Ryzyka</h3>
+    <ul>{% for r in analysis.ryzyka %}<li>{{ r }}</li>{% endfor %}</ul>
+    {% endif %}
+
+    <h2>Newsy krypto (PL)</h2>
+    <p class="muted">RSS branżowe — BTC, ETH i szerszy rynek krypto (nie tylko Bitcoin).</p>
+    <ul>
+      {% for a in crypto_pl %}
+      <li>
+        <span class="article-title"><a href="{{ a.link }}">{{ a.title_pl or a.title }}</a></span>
+        <span class="src"> ({{ a.source }})</span>
+        <span class="article-sum">{{ a.summary_pl or a.summary or 'Brak streszczenia.' }}</span>
+      </li>
+      {% else %}
+      <li class="muted">Brak artykułów.</li>
+      {% endfor %}
+    </ul>
+
+    <h2>Newsy krypto (EN → PL)</h2>
+    <ul>
+      {% for a in crypto_en %}
+      <li>
+        <span class="article-title"><a href="{{ a.link }}">{{ a.title_en or a.title }}</a></span>
+        <span class="src"> ({{ a.source }})</span>
+        {% if a.title_pl %}<br /><span><b>PL:</b> {{ a.title_pl }}</span>{% endif %}
+        <span class="article-sum">{{ a.summary_pl or 'Brak polskiego streszczenia.' }}</span>
+      </li>
+      {% else %}
+      <li class="muted">Brak artykułów.</li>
+      {% endfor %}
+    </ul>
+
+    <h2>Makro / ekonomia</h2>
+    <ul>
+      {% for a in macro %}
+      <li>
+        <span class="article-title"><a href="{{ a.link }}">{{ a.title_pl or a.title }}</a></span>
+        <span class="src"> ({{ a.source }})</span>
+        <span class="article-sum">{{ a.summary_pl or a.summary or 'Brak streszczenia.' }}</span>
+      </li>
+      {% else %}
+      <li class="muted">Brak artykułów.</li>
+      {% endfor %}
+    </ul>
+
+    <h2>Fora krypto — trendy i dyskusje</h2>
+    <p>{{ forum_block.overall or 'Brak podsumowania forów.' }}</p>
+    {% if forum_block.hot_topics %}
+    <h3>Gorące tematy</h3>
+    <p>{% for t in forum_block.hot_topics %}<span class="pill">{{ t }}</span>{% endfor %}</p>
+    {% endif %}
+    {% if forum_block.cold_or_fading %}
+    <h3>Mniej głośne / stygnące</h3>
+    <p>{% for t in forum_block.cold_or_fading %}<span class="pill">{{ t }}</span>{% endfor %}</p>
+    {% endif %}
+    <h3>Wybrane wątki</h3>
+    <ul>
+      {% for t in forum_block.summaries or [] %}
+      <li>
+        <span class="article-title"><a href="{{ t.link }}">{{ t.title_pl or t.title }}</a></span>
+        {% if t.title and t.title_pl and t.title != t.title_pl %}
+        <br /><span class="muted">EN: {{ t.title }}</span>
+        {% endif %}
+        <span class="article-sum">{{ t.summary_pl or '' }}</span>
+      </li>
+      {% else %}
+      <li class="muted">Brak wątków.</li>
+      {% endfor %}
+    </ul>
+
+    <h2>Źródła</h2>
+    <ul class="src">
+      <li>CoinGecko (BTC/ETH + top 10), NBP, alternative.me, mempool.space, Yahoo (^TNX)</li>
+      <li>XOOMAR ETF flows (+ fallback Farside), CryptoDataAPI exchange netflow</li>
+      <li>RSS z config.yaml, BitcoinTalk, TradingView</li>
+    </ul>
+  </div>
+
+  <script>
+    function bootTv(containerId, symbol) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      if (typeof TradingView === 'undefined') {
+        el.innerHTML = '<p class="muted" style="padding:12px">Widget TradingView niedostępny w tej przeglądarce — użyj przycisku poniżej.</p>';
+        return;
+      }
+      new TradingView.widget({
+        container_id: containerId,
+        symbol: symbol,
+        interval: 'D',
+        timezone: 'Europe/Warsaw',
+        theme: 'light',
+        style: '1',
+        locale: 'pl',
+        toolbar_bg: '#f6f4ef',
+        enable_publishing: false,
+        allow_symbol_change: true,
+        hide_side_toolbar: false,
+        studies: ['MASimple@tv-basicstudies', 'RSI@tv-basicstudies'],
+        width: '100%',
+        height: 520
+      });
+    }
+    (function loadTv() {
+      const s = document.createElement('script');
+      s.src = 'https://s3.tradingview.com/tv.js';
+      s.onload = function () {
+        bootTv('tv-widget', 'BITSTAMP:BTCUSD');
+        bootTv('tv-widget-eth', 'BITSTAMP:ETHUSD');
+      };
+      s.onerror = function () {
+        bootTv('tv-widget', 'BITSTAMP:BTCUSD');
+        bootTv('tv-widget-eth', 'BITSTAMP:ETHUSD');
+      };
+      document.body.appendChild(s);
+    })();
+  </script>
+</body>
+</html>

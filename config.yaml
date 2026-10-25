@@ -1,0 +1,92 @@
+timezone: Europe/Warsaw
+send_hour_local: 7
+send_minute_local: 30
+
+tradingview_url: "https://www.tradingview.com/chart/?symbol=BITSTAMP%3ABTCUSD"
+tradingview_eth_url: "https://www.tradingview.com/chart/?symbol=BITSTAMP%3AETHUSD"
+
+limits:
+  crypto_articles: 14
+  macro_articles: 6
+  forum_threads: 8
+  per_feed: 5
+
+rss_crypto_pl:
+  - name: BitHub
+    url: https://bithub.pl/feed/
+    lang: pl
+  - name: Bitcoin.pl
+    url: https://bitcoin.pl/feed/
+    lang: pl
+  - name: BeInCrypto PL
+    url: https://beincrypto.pl/feed/
+    lang: pl
+  - name: Kryptowaluty.info.pl
+    url: https://kryptowaluty.info.pl/feed/
+    lang: pl
+  - name: Comparic
+    url: https://comparic.pl/feed/
+    lang: pl
+  - name: KryptoEkonomia
+    url: https://kryptoekonomia.pl/feed/
+    lang: pl
+  - name: Money.pl Krypto
+    url: https://www.money.pl/rss/kryptowaluty.xml
+    lang: pl
+  - name: FXMAG
+    url: https://www.fxmag.pl/rss
+    lang: pl
+
+rss_crypto_en:
+  - name: CoinDesk
+    url: https://www.coindesk.com/arc/outboundfeeds/rss/
+    lang: en
+  - name: Cointelegraph
+    url: https://cointelegraph.com/rss
+    lang: en
+  - name: Decrypt
+    url: https://decrypt.co/feed
+    lang: en
+  - name: CryptoSlate
+    url: https://cryptoslate.com/feed/
+    lang: en
+  - name: Blockworks
+    url: https://blockworks.co/feed
+    lang: en
+  - name: The Block
+    url: https://www.theblock.co/rss.xml
+    lang: en
+  - name: NewsBTC
+    url: https://newsbtc.com/feed/
+    lang: en
+  - name: Bitcoinist
+    url: https://bitcoinist.com/feed/
+    lang: en
+  - name: U.Today
+    url: https://u.today/rss
+    lang: en
+  - name: AMBCrypto
+    url: https://ambcrypto.com/feed/
+    lang: en
+
+rss_macro:
+  - name: Bankier
+    url: https://www.bankier.pl/rss/wiadomosci.xml
+    lang: pl
+  - name: Money.pl
+    url: https://www.money.pl/rss/
+    lang: pl
+  - name: Federal Reserve Press
+    url: https://www.federalreserve.gov/feeds/press_all.xml
+    lang: en
+
+forum:
+  bitcointalk_board_url: https://bitcointalk.org/index.php?board=1.0
+  user_agent: "btc-daily-report/1.0 (+personal research bot; respectful crawl)"
+
+chart:
+  daily_days: 30
+  weekly_days: 90
+  monthly_days: 180
+  quarterly_days: 365
+  yearly_days: 730
