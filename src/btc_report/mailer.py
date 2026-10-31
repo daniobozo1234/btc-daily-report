@@ -57,7 +57,9 @@ def send_email(
 ) -> dict[str, Any]:
     """Wysyła krótki mail z linkiem do pełnego raportu (bez ciężkiego HTML w treści)."""
     api_key = cfg.require_env("RESEND_API_KEY")
-    to_email = cfg.require_env("REPORT_TO_EMAIL")
+    to_emails = _parse_recipients(cfg.require_env("REPORT_TO_EMAIL"))
+    if not to_emails:
+        raise RuntimeError("REPORT_TO_EMAIL jest puste — podaj co najmniej jeden adres.")
     from_email = (
         cfg.env("REPORT_FROM_EMAIL", "BTC Report <onboarding@resend.dev>")
         or "BTC Report <onboarding@resend.dev>"
@@ -72,11 +74,18 @@ def send_email(
     resend.api_key = api_key
     params: dict[str, Any] = {
         "from": from_email,
-        "to": [to_email],
+        "to": to_emails,
         "subject": subject,
         "html": cover,
     }
+    print(f"→ odbiorcy: {', '.join(to_emails)}")
     return resend.Emails.send(params)
+
+
+def _parse_recipients(raw: str) -> list[str]:
+    """Jeden lub wiele adresów: przecinek / średnik / nowa linia."""
+    parts = raw.replace(";", ",").replace("\n", ",").split(",")
+    return [p.strip() for p in parts if p.strip()]
 
 
 def build_cover_html(

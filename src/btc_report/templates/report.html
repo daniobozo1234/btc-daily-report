@@ -44,6 +44,9 @@
   <div class="wrap">
     <h1>{{ titles }}</h1>
     <p class="muted">Wygenerowano: {{ generated_at }} · <a href="archiwum.html">archiwum dni</a></p>
+    {% if period and period.start_pl and period.end_pl and period.type != 'daily' %}
+    <p class="note">Zakres analizy: <b>{{ period.start_pl }}</b> → <b>{{ period.end_pl }}</b> ({{ period.label_pl }}).</p>
+    {% endif %}
 
     {% if analysis.ai_enabled %}
     <p class="muted">AI: {{ analysis.ai_provider or 'ok' }} / {{ analysis.ai_model or '' }}</p>
@@ -262,7 +265,7 @@
       <a class="btn" href="{{ tradingview_eth_url }}" target="_blank" rel="noopener">Otwórz TradingView ETH</a>
     </p>
 
-    <h2>Podsumowanie rynku AI</h2>
+    <h2>{% if period and period.label_pl and period.type != 'daily' %}{{ period.label_pl }} — analiza AI{% else %}Podsumowanie rynku AI{% endif %}</h2>
     {% if analysis.tytul_dnia %}
     <p><b>{{ analysis.tytul_dnia }}</b></p>
     {% endif %}

@@ -116,5 +116,61 @@ def log_sent(report_types: list[str], subject: str, provider_id: str | None) -> 
         )
 
 
+def period_market_summary(start: datetime, end: datetime) -> dict[str, Any]:
+    """Min/max/start/end BTC(+ETH) z lokalnych snapshotów w oknie okresu."""
+    init_db()
+    start_s = start.astimezone(timezone.utc).isoformat()
+    end_s = end.astimezone(timezone.utc).isoformat()
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT fetched_at, payload FROM market_snapshots
+            WHERE fetched_at >= ? AND fetched_at <= ?
+            ORDER BY fetched_at ASC
+            """,
+            (start_s, end_s),
+        ).fetchall()
+
+    points: list[dict[str, Any]] = []
+    for fetched_at, payload in rows:
+        try:
+            snap = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        btc = snap.get("btc_usd")
+        if btc is None:
+            continue
+        points.append(
+            {
+                "fetched_at": fetched_at,
+                "btc_usd": float(btc),
+                "eth_usd": float(snap["eth_usd"]) if snap.get("eth_usd") is not None else None,
+                "fear_greed": snap.get("fear_greed"),
+                "etf_latest_flow_musd": snap.get("etf_latest_flow_musd"),
+            }
+        )
+
+    if not points:
+        return {"samples": 0, "note": "Brak lokalnych snapshotów w tym okresie — opieram się na zmianach % z CoinGecko."}
+
+    btcs = [p["btc_usd"] for p in points]
+    first, last = points[0], points[-1]
+    chg = ((last["btc_usd"] / first["btc_usd"]) - 1.0) * 100.0 if first["btc_usd"] else None
+    return {
+        "samples": len(points),
+        "start_at": first["fetched_at"],
+        "end_at": last["fetched_at"],
+        "btc_start": first["btc_usd"],
+        "btc_end": last["btc_usd"],
+        "btc_min": min(btcs),
+        "btc_max": max(btcs),
+        "btc_change_pct": chg,
+        "eth_start": first.get("eth_usd"),
+        "eth_end": last.get("eth_usd"),
+        "fear_greed_last": last.get("fear_greed"),
+        "note": f"Na podstawie {len(points)} lokalnych snapshotów z bazy raportu.",
+    }
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()

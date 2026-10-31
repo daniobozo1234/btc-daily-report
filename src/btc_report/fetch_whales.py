@@ -104,18 +104,11 @@ def _fetch_cryptodataapi(now: str) -> WhaleSnapshot:
         )
 
     headers = {"X-API-Key": key, "User-Agent": "btc-daily-report/1.0"}
+    # Każdy endpoint osobno — dawniej jeden błąd history (stary param limit)
+    # kasował też żywy snapshot netflow.
     try:
         snap = get_json(
             "https://cryptodataapi.com/api/v1/on-chain/exchange-flows/BTC",
-            headers=headers,
-        )
-        hist = get_json(
-            "https://cryptodataapi.com/api/v1/on-chain/exchange-flows/BTC/history",
-            params={"limit": "72"},
-            headers=headers,
-        )
-        spikes = get_json(
-            "https://cryptodataapi.com/api/v1/on-chain/exchange-flows/spike-alerts",
             headers=headers,
         )
     except Exception as exc:
@@ -124,6 +117,31 @@ def _fetch_cryptodataapi(now: str) -> WhaleSnapshot:
             source="cryptodataapi",
             note=f"Nie udało się pobrać whale/netflow: {exc}",
         )
+
+    hist: dict[str, Any] = {}
+    try:
+        end = datetime.now(timezone.utc)
+        start = end.timestamp() - 3 * 24 * 3600
+        hist = get_json(
+            "https://cryptodataapi.com/api/v1/on-chain/exchange-flows/BTC/history",
+            params={
+                "start": str(int(start)),
+                "end": str(int(end.timestamp())),
+                "interval": "1h",
+            },
+            headers=headers,
+        ) or {}
+    except Exception as exc:
+        print(f"! CryptoDataAPI history pominięte: {exc}")
+
+    spikes: dict[str, Any] = {}
+    try:
+        spikes = get_json(
+            "https://cryptodataapi.com/api/v1/on-chain/exchange-flows/spike-alerts",
+            headers=headers,
+        ) or {}
+    except Exception as exc:
+        print(f"! CryptoDataAPI spike-alerts pominięte: {exc}")
 
     windows = (snap or {}).get("windows") or {}
     w1 = windows.get("1h") or {}

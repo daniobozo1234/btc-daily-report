@@ -10,10 +10,16 @@ import httpx
 from btc_report import config as cfg
 
 
-def publish_report_html(html: str, *, date_stamp: str | None = None) -> str | None:
+def publish_report_html(
+    html: str,
+    *,
+    date_stamp: str | None = None,
+    update_latest: bool = True,
+) -> str | None:
     """Wstaw raport na GitHub (docs/) i zwróć link GitHub Pages (wykresy JS działają).
 
     Wymaga w .env: GITHUB_TOKEN, GITHUB_REPO (+ opcjonalnie GITHUB_BRANCH).
+    update_latest=False — tylko plik z datą/okresem (nie nadpisuj index / latest).
     """
     token = cfg.env("GITHUB_TOKEN")
     repo = cfg.env("GITHUB_REPO")
@@ -23,11 +29,10 @@ def publish_report_html(html: str, *, date_stamp: str | None = None) -> str | No
 
     branch = cfg.env("GITHUB_BRANCH") or "main"
     stamp = date_stamp or datetime.now(timezone.utc).strftime("%Y%m%d")
-    files = {
-        "docs/report_latest.html": html,
-        f"docs/report_{stamp}.html": html,
-        "docs/index.html": html,
-    }
+    files = {f"docs/report_{stamp}.html": html}
+    if update_latest:
+        files["docs/report_latest.html"] = html
+        files["docs/index.html"] = html
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -103,8 +108,13 @@ def _build_archive_html(
     names = _list_dated_reports(client, repo, branch)
     rows = []
     for name in names:
+        if name in {"report_latest.html"}:
+            continue
         stamp = name[7:15]
         label = f"{stamp[6:8]}.{stamp[4:6]}.{stamp[0:4]}"
+        rest = name[15:-5]  # np. "" albo "_monthly"
+        if rest.startswith("_") and rest[1:]:
+            label = f"{label} — {rest[1:]}"
         rows.append(f'      <li><a href="{name}">{label}</a></li>')
     body = "\n".join(rows) if rows else "      <li>Brak zapisanych dni.</li>"
     latest_href = (pages_url.rstrip("/") + "/") if pages_url else "./"

@@ -54,12 +54,15 @@ def render_html(
     whale_chart_path: Path | None = None,
     whales: dict[str, Any] | None = None,
     generated_at: str,
+    period: dict[str, Any] | None = None,
 ) -> str:
     titles = " + ".join(LABELS.get(t, t) for t in report_types)
+    period = period or {}
     tmpl = _env().get_template("report.html")
     return tmpl.render(
         titles=titles,
         report_types=report_types,
+        period=period,
         market=market,
         crypto_pl=articles.get("crypto_pl", []),
         crypto_en=articles.get("crypto_en", []),

@@ -79,16 +79,58 @@ Zasady:
 """
 
 
+def _period_focus_instruction(report_type: str, period: dict[str, Any] | None = None) -> str:
+    """Instrukcja skali analizy — daily ≠ monthly."""
+    period = period or {}
+    label = period.get("label_pl") or report_type
+    start = period.get("start") or ""
+    end = period.get("end") or ""
+    window = f" Okres: {start} → {end}." if start and end else ""
+    if report_type == "daily":
+        return (
+            "To RAPORT DZIENNY: skup się na ostatnich ~24h i tym, co ważne NA DZIŚ. "
+            "Nie rób retrospektywy całego miesiąca."
+        )
+    if report_type == "weekly":
+        return (
+            f"To PODSUMOWANIE TYGODNIA ({label}).{window} "
+            "Analizuj CAŁY TYDZIEŃ: jak cena/zmiany, ETF, netflow i newsy ułożyły się przez te dni. "
+            "Nie ograniczaj się do samego dzisiejszego dnia."
+        )
+    if report_type == "monthly":
+        return (
+            f"To PODSUMOWANIE MIESIĄCA ({label}).{window} "
+            "Analizuj CAŁY MIESIĄC: trajektoria ceny (start/min/max/koniec z period_history), "
+            "główne wątki miesiąca, bias netflow i makro w skali miesiąca. "
+            "To NIE jest raport dzienny z inną etykietą."
+        )
+    if report_type == "quarterly":
+        return (
+            f"To PODSUMOWANIE KWARTAŁU ({label}).{window} "
+            "Patrz na cały kwartał: trendy, reżimy rynku, kluczowe eventy. Nie pisz jak codziennego briefu."
+        )
+    if report_type == "yearly":
+        return (
+            f"To PODSUMOWANIE ROKU ({label}).{window} "
+            "Perspektywa roczna: wielkie wątki, zmiany struktury rynku, wnioski na kolejny rok."
+        )
+    return f"Skala raportu: {label}.{window}"
+
+
 def build_brief(
     market: dict[str, Any],
     articles: dict[str, list[dict]],
     forum: list[dict],
     report_types: list[str],
     whales: dict[str, Any] | None = None,
+    period: dict[str, Any] | None = None,
+    period_history: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     whales = whales or {}
     return {
         "report_types": report_types,
+        "period": period or {},
+        "period_history": period_history or {},
         "market": {
             k: market.get(k)
             for k in (
@@ -164,7 +206,7 @@ def build_brief(
     }
 
 
-def analyze(brief: dict[str, Any]) -> dict[str, Any]:
+def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None) -> dict[str, Any]:
     if not _resolve_ai():
         return _fallback(brief)
 
@@ -175,106 +217,132 @@ def analyze(brief: dict[str, Any]) -> dict[str, Any]:
     pl_all = brief.get("crypto_pl") or []
     en_all = brief.get("crypto_en") or []
 
-    # Groq free: niski limit output tokens/min — małe batche + max_tokens<=900
-    print("  · AI news PL (1/2)…")
-    news_pl_a = _chat_json(
-        NEWS_SYSTEM,
-        "Streszcz PL newsy (3 pełne zdania, po polsku):\n"
-        + json.dumps({"crypto_pl": pl_all[:7]}, ensure_ascii=False),
-        model_override=news_model,
-        max_tokens=900,
-    ) or {}
-    time.sleep(20)
-    print("  · AI news PL (2/2)…")
-    news_pl_b = _chat_json(
-        NEWS_SYSTEM,
-        "Streszcz PL newsy (3 pełne zdania, po polsku):\n"
-        + json.dumps({"crypto_pl": pl_all[7:]}, ensure_ascii=False),
-        model_override=news_model,
-        max_tokens=900,
-    ) or {}
-    time.sleep(20)
-
-    # EN: batche po 2 + slim input — mniej ucięć JSON / lepsze PL
-    en_parts: list[dict] = []
-    en_batch = 2
-    en_total_batches = max(1, (len(en_all) + en_batch - 1) // en_batch) if en_all else 0
-    for i in range(0, len(en_all), en_batch):
-        chunk = _slim_en_for_translate(en_all[i : i + en_batch])
-        print(f"  · AI news EN→PL ({i // en_batch + 1}/{en_total_batches})…")
-        part = _chat_json(
+    if shared_news and shared_news.get("ready"):
+        print("  · AI news/fora — używam cache z poprzedniego raportu w tej rundzie…")
+        news_pl = shared_news["news_pl"]
+        news_en = shared_news["news_en"]
+        news_macro = shared_news["news_macro"]
+        forum = shared_news["forum"]
+    else:
+        # Groq free: niski limit output tokens/min — małe batche + max_tokens<=900
+        print("  · AI news PL (1/2)…")
+        news_pl_a = _chat_json(
             NEWS_SYSTEM,
-            "Przetłumacz KAŻDY artykuł na polski. title_pl i summary_pl TYLKO po polsku. "
-            "summary_pl = dokładnie 3 krótkie pełne zdania z kropkami. "
-            "Zwróć crypto_en z WSZYSTKIMI linkami z wejścia. Krótki JSON, bez markdown.\n"
-            + json.dumps({"crypto_en": chunk}, ensure_ascii=False),
+            "Streszcz PL newsy (3 pełne zdania, po polsku):\n"
+            + json.dumps({"crypto_pl": pl_all[:7]}, ensure_ascii=False),
+            model_override=news_model,
+            max_tokens=900,
+        ) or {}
+        time.sleep(20)
+        print("  · AI news PL (2/2)…")
+        news_pl_b = _chat_json(
+            NEWS_SYSTEM,
+            "Streszcz PL newsy (3 pełne zdania, po polsku):\n"
+            + json.dumps({"crypto_pl": pl_all[7:]}, ensure_ascii=False),
+            model_override=news_model,
+            max_tokens=900,
+        ) or {}
+        time.sleep(20)
+
+        # EN: batche po 2 + slim input — mniej ucięć JSON / lepsze PL
+        en_parts: list[dict] = []
+        en_batch = 2
+        en_total_batches = max(1, (len(en_all) + en_batch - 1) // en_batch) if en_all else 0
+        for i in range(0, len(en_all), en_batch):
+            chunk = _slim_en_for_translate(en_all[i : i + en_batch])
+            print(f"  · AI news EN→PL ({i // en_batch + 1}/{en_total_batches})…")
+            part = _chat_json(
+                NEWS_SYSTEM,
+                "Przetłumacz KAŻDY artykuł na polski. title_pl i summary_pl TYLKO po polsku. "
+                "summary_pl = dokładnie 3 krótkie pełne zdania z kropkami. "
+                "Zwróć crypto_en z WSZYSTKIMI linkami z wejścia. Krótki JSON, bez markdown.\n"
+                + json.dumps({"crypto_en": chunk}, ensure_ascii=False),
+                model_override=news_model,
+                max_tokens=700,
+            ) or {}
+            got = part.get("crypto_en") or []
+            missing_chunk = _missing_en_translations(chunk, got)
+            if missing_chunk:
+                time.sleep(22)
+                for one in missing_chunk:
+                    got = _merge_en_by_link(got, [_translate_one_en(one, news_model, base_model)])
+                    time.sleep(16)
+            en_parts.extend(got)
+            if i + en_batch < len(en_all):
+                time.sleep(22)
+
+        print("  · AI makro…")
+        news_macro = _chat_json(
+            NEWS_SYSTEM,
+            "Streszcz makro po polsku (3 pełne zdania):\n"
+            + json.dumps({"macro": brief.get("macro") or []}, ensure_ascii=False),
             model_override=news_model,
             max_tokens=700,
         ) or {}
-        got = part.get("crypto_en") or []
-        missing_chunk = _missing_en_translations(chunk, got)
-        if missing_chunk:
-            time.sleep(22)
-            for one in missing_chunk:
-                got = _merge_en_by_link(got, [_translate_one_en(one, news_model, base_model)])
-                time.sleep(16)
-        en_parts.extend(got)
-        if i + en_batch < len(en_all):
-            time.sleep(22)
+        time.sleep(22)
 
-    print("  · AI makro…")
-    news_macro = _chat_json(
-        NEWS_SYSTEM,
-        "Streszcz makro po polsku (3 pełne zdania):\n"
-        + json.dumps({"macro": brief.get("macro") or []}, ensure_ascii=False),
-        model_override=news_model,
-        max_tokens=700,
-    ) or {}
-    time.sleep(22)
+        print("  · AI fora (po polsku)…")
+        forum_ai = _chat_json(
+            FORUM_SYSTEM,
+            "Przeanalizuj i przetłumacz wątki forum na polski:\n"
+            + json.dumps({"forum_threads": brief.get("forum") or []}, ensure_ascii=False),
+            model_override=news_model,
+            max_tokens=900,
+        ) or {}
+        time.sleep(22)
 
-    print("  · AI fora (po polsku)…")
-    forum_ai = _chat_json(
-        FORUM_SYSTEM,
-        "Przeanalizuj i przetłumacz wątki forum na polski:\n"
-        + json.dumps({"forum_threads": brief.get("forum") or []}, ensure_ascii=False),
-        model_override=news_model,
-        max_tokens=900,
-    ) or {}
-    time.sleep(22)
+        news_pl = {
+            "crypto_pl": (news_pl_a.get("crypto_pl") or []) + (news_pl_b.get("crypto_pl") or [])
+        }
+        news_en = {"crypto_en": en_parts}
 
-    news_pl = {
-        "crypto_pl": (news_pl_a.get("crypto_pl") or []) + (news_pl_b.get("crypto_pl") or [])
-    }
-    news_en = {"crypto_en": en_parts}
+        missing_en = _missing_en_translations(en_all, news_en.get("crypto_en") or [])
+        if missing_en:
+            print(f"  · AI EN→PL dopychanie ({len(missing_en)} szt.)…")
+            fixed = []
+            for one in _slim_en_for_translate(missing_en):
+                time.sleep(20)
+                fixed.append(_translate_one_en(one, news_model, base_model))
+            news_en["crypto_en"] = _merge_en_by_link(news_en.get("crypto_en") or [], fixed)
+            still = _missing_en_translations(en_all, news_en.get("crypto_en") or [])
+            if still:
+                print(f"  · AI EN→PL ostatnia szansa ({len(still)} szt., model {base_model})…")
+                more = []
+                for one in _slim_en_for_translate(still):
+                    time.sleep(25)
+                    more.append(_translate_one_en(one, base_model, base_model))
+                news_en["crypto_en"] = _merge_en_by_link(news_en.get("crypto_en") or [], more)
 
-    missing_en = _missing_en_translations(en_all, news_en.get("crypto_en") or [])
-    if missing_en:
-        print(f"  · AI EN→PL dopychanie ({len(missing_en)} szt.)…")
-        fixed = []
-        for one in _slim_en_for_translate(missing_en):
-            time.sleep(20)
-            fixed.append(_translate_one_en(one, news_model, base_model))
-        news_en["crypto_en"] = _merge_en_by_link(news_en.get("crypto_en") or [], fixed)
-        still = _missing_en_translations(en_all, news_en.get("crypto_en") or [])
-        if still:
-            print(f"  · AI EN→PL ostatnia szansa ({len(still)} szt., model {base_model})…")
-            more = []
-            for one in _slim_en_for_translate(still):
-                time.sleep(25)
-                more.append(_translate_one_en(one, base_model, base_model))
-            news_en["crypto_en"] = _merge_en_by_link(news_en.get("crypto_en") or [], more)
+        forum = (forum_ai.get("forum") or {}) if isinstance(forum_ai, dict) else {}
+        if not forum.get("summaries"):
+            forum = _forum_fallback_pl(brief.get("forum") or [])
 
-    forum = (forum_ai.get("forum") or {}) if isinstance(forum_ai, dict) else {}
-    if not forum.get("summaries"):
-        forum = _forum_fallback_pl(brief.get("forum") or [])
+        for s in forum.get("summaries") or []:
+            if not s.get("title_pl"):
+                s["title_pl"] = s.get("title")
+            s["summary_pl"] = _finish_sentence(s.get("summary_pl") or "")
 
-    for s in forum.get("summaries") or []:
-        if not s.get("title_pl"):
-            s["title_pl"] = s.get("title")
-        s["summary_pl"] = _finish_sentence(s.get("summary_pl") or "")
+        if shared_news is not None:
+            shared_news.clear()
+            shared_news.update(
+                {
+                    "ready": True,
+                    "news_pl": news_pl,
+                    "news_en": news_en,
+                    "news_macro": news_macro,
+                    "forum": forum,
+                }
+            )
+
+    period = brief.get("period") or {}
+    primary = (brief.get("report_types") or ["daily"])[0]
+    period_focus = _period_focus_instruction(primary, period)
 
     # Rozbudowane podsumowanie = 3 wywołania + retry brakujących pól
     ctx = {
+        "report_type": primary,
+        "period": period,
+        "period_history": brief.get("period_history") or {},
         "market": brief.get("market"),
         "whales": {
             k: (brief.get("whales") or {}).get(k)
@@ -324,27 +392,30 @@ def analyze(brief: dict[str, Any]) -> dict[str, Any]:
         return part
 
     part1 = _outlook_part(
-        "AI outlook 1/3 — wątki i trendy",
+        f"AI outlook 1/3 — wątki i trendy ({primary})",
         "Jesteś polskim analitykiem BTC. TYLKO JSON, po polsku. "
-        "Każdy opis 2-3 krótkie zdania. Max 5 wątków i 4 trendy. Schema: "
+        + period_focus
+        + " Każdy opis 2-3 krótkie zdania. Max 5 wątków i 4 trendy. Schema: "
         '{"tytul_dnia":"...","glowne_watki":[{"watek":"...","opis":"..."}],'
         '"trendy_rynku":[{"trend":"...","kierunek":"wzrostowy|spadkowy|boczny|mieszany","opis":"..."}]}',
-        "Na podstawie briefu wypisz tytuł dnia, główne wątki i trendy:\n" + ctx_json,
+        "Na podstawie briefu wypisz tytuł okresu, główne wątki i trendy:\n" + ctx_json,
     )
     part2 = _outlook_part(
-        "AI outlook 2/3 — makro, wieloryby, obraz rynku",
+        f"AI outlook 2/3 — makro, wieloryby, obraz rynku ({primary})",
         "Jesteś polskim analitykiem BTC. TYLKO JSON, po polsku. "
-        "Każde pole = 3-4 krótkie zdania (nie więcej). Schema: "
+        + period_focus
+        + " Każde pole = 3-4 krótkie zdania (nie więcej). Schema: "
         '{"makro_a_btc":"...","wieloryby":"...","obraz_rynku":"..."}',
-        "Opisz makro vs BTC, netflow/wieloryby i obraz rynku (zwięźle):\n" + ctx_json,
+        "Opisz makro vs BTC, netflow/wieloryby i obraz rynku w skali tego okresu:\n" + ctx_json,
     )
     part3 = _outlook_part(
-        "AI outlook 3/3 — scenariusze i wnioski",
+        f"AI outlook 3/3 — scenariusze i wnioski ({primary})",
         "Jesteś polskim analitykiem BTC. TYLKO JSON, po polsku. "
-        "Scenariusze po 2-3 zdania. Schema: "
+        + period_focus
+        + " Scenariusze po 2-3 zdania. Schema: "
         '{"scenariusze_btc":{"bazowy":"...","optymistyczny":"...","pesymistyczny":"..."},'
         '"na_radarze":["..."],"ryzyka":["..."],"wnioski":["..."]}',
-        "Napisz scenariusze BTC, na_radarze (4), ryzyka (3), wnioski (5 krótkich punktów):\n" + ctx_json,
+        "Napisz scenariusze BTC, na_radarze (4), ryzyka (3), wnioski (5) dla tego okresu:\n" + ctx_json,
     )
 
     conclusions = {**part1, **part2, **part3}

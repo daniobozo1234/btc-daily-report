@@ -34,13 +34,15 @@ def window_for(report_type: str, when: datetime | None = None, tz_name: str = "E
     if report_type == "daily":
         start = end - timedelta(days=1)
     elif report_type == "weekly":
-        start = end - timedelta(days=7)
+        # tydzień kalendarzowy: poniedziałek 00:00 → teraz
+        start = (end - timedelta(days=end.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
     elif report_type == "monthly":
-        start = end - timedelta(days=30)
+        start = end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     elif report_type == "quarterly":
-        start = end - timedelta(days=90)
+        q_month = ((end.month - 1) // 3) * 3 + 1
+        start = end.replace(month=q_month, day=1, hour=0, minute=0, second=0, microsecond=0)
     elif report_type == "yearly":
-        start = end - timedelta(days=365)
+        start = end.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     else:
         raise ValueError(f"Unknown report type: {report_type}")
 
