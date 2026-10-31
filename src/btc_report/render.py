@@ -41,6 +41,48 @@ def _b64(path: Path | None) -> str | None:
     return None
 
 
+_WHALE_KEYS = (
+    "net_1h_btc",
+    "net_6h_btc",
+    "net_24h_btc",
+    "net_7d_btc",
+    "inflow_24h_btc",
+    "outflow_24h_btc",
+    "bias_24h",
+    "bias_7d",
+    "note",
+    "coverage_note",
+    "per_exchange_24h",
+    "missing_exchanges",
+    "history_hourly",
+    "recent_spikes",
+    "related_spikes",
+    "whale_alert_txs",
+    "large_onchain",
+    "source",
+    "fetched_at",
+)
+
+
+def _whales_for_template(whales: dict[str, Any] | None) -> dict[str, Any]:
+    """Pełny dict pod Jinja — brakujące klucze = None (bez AttributeError)."""
+    out = {k: None for k in _WHALE_KEYS}
+    out.update(
+        {
+            "per_exchange_24h": [],
+            "missing_exchanges": [],
+            "history_hourly": [],
+            "recent_spikes": [],
+            "related_spikes": [],
+            "whale_alert_txs": [],
+            "large_onchain": [],
+        }
+    )
+    if whales:
+        out.update(whales)
+    return out
+
+
 def render_html(
     *,
     report_types: list[str],
@@ -55,14 +97,18 @@ def render_html(
     whales: dict[str, Any] | None = None,
     generated_at: str,
     period: dict[str, Any] | None = None,
+    period_context: dict[str, Any] | None = None,
 ) -> str:
     titles = " + ".join(LABELS.get(t, t) for t in report_types)
     period = period or {}
+    period_context = period_context or {}
     tmpl = _env().get_template("report.html")
     return tmpl.render(
         titles=titles,
         report_types=report_types,
         period=period,
+        period_context=period_context,
+        is_period_report=bool(analysis.get("is_period_report") or (period.get("type") not in (None, "daily"))),
         market=market,
         crypto_pl=articles.get("crypto_pl", []),
         crypto_en=articles.get("crypto_en", []),
@@ -74,7 +120,7 @@ def render_html(
         or "https://www.tradingview.com/chart/?symbol=BITSTAMP%3AETHUSD",
         etf_chart_b64=_b64(etf_chart_path),
         whale_chart_b64=_b64(whale_chart_path),
-        whales=whales or {},
+        whales=_whales_for_template(whales),
         generated_at=generated_at,
         fmt_num=fmt_num,
         fmt_pct=fmt_pct,

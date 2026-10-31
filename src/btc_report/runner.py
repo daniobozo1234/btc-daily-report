@@ -7,12 +7,13 @@ from zoneinfo import ZoneInfo
 
 from btc_report import config as cfg
 from btc_report import store
-from btc_report.analyze import analyze, build_brief, merge_enriched_articles
+from btc_report.analyze import analyze, analyze_period, build_brief, merge_enriched_articles
 from btc_report.charts import render_etf_bars, render_whale_netflow
 from btc_report.fetch_articles import enrich_with_excerpts
 from btc_report.fetch_forum import fetch_bitcointalk
 from btc_report.fetch_market import collect_market
 from btc_report.fetch_news import collect_articles
+from btc_report.fetch_period import collect_period_context
 from btc_report.fetch_whales import fetch_whale_flows
 from btc_report.mailer import send_email, subject_line
 from btc_report.periods import LABELS, detect_report_types, now_local, window_for
@@ -88,18 +89,39 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
             "end_pl": win.end.strftime("%d.%m.%Y"),
         }
         period_history = store.period_market_summary(win.start, win.end)
-        brief = build_brief(
-            market,
-            articles_raw,
-            forum,
-            [report_type],
-            whales=whales,
-            period=period_meta,
-            period_history=period_history,
-        )
-        analysis = analyze(brief, shared_news=shared_news)
-        articles = merge_enriched_articles(articles_raw, analysis)
-        forum_block = analysis.get("forum") or {}
+        period_context = None
+        if report_type == "daily":
+            brief = build_brief(
+                market,
+                articles_raw,
+                forum,
+                [report_type],
+                whales=whales,
+                period=period_meta,
+                period_history=period_history,
+            )
+            analysis = analyze(brief, shared_news=shared_news)
+            articles = merge_enriched_articles(articles_raw, analysis)
+            forum_block = analysis.get("forum") or {}
+        else:
+            print(f"  · zbieram kontekst okresu ({report_type})…")
+            period_context = collect_period_context(win)
+            # CoinGecko path nadpisuje rzadkie snapshoty SQLite
+            if (period_context.get("price_path") or {}).get("btc_start") is not None:
+                period_history = period_context["price_path"]
+            brief = build_brief(
+                market,
+                {"crypto_pl": [], "crypto_en": [], "macro": []},
+                [],
+                [report_type],
+                whales=whales,
+                period=period_meta,
+                period_history=period_history,
+                period_context=period_context,
+            )
+            analysis = analyze_period(brief)
+            articles = {"crypto_pl": [], "crypto_en": [], "macro": []}
+            forum_block = analysis.get("forum") or {}
 
         generated_at = generated.isoformat(timespec="seconds")
         html = render_html(
@@ -112,11 +134,12 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
             or "https://www.tradingview.com/chart/?symbol=BITSTAMP%3ABTCUSD",
             tradingview_eth_url=config.get("tradingview_eth_url")
             or "https://www.tradingview.com/chart/?symbol=BITSTAMP%3AETHUSD",
-            etf_chart_path=etf_chart_path,
-            whale_chart_path=whale_chart_path,
+            etf_chart_path=etf_chart_path if report_type == "daily" else None,
+            whale_chart_path=whale_chart_path if report_type == "daily" else None,
             whales=whales,
             generated_at=generated_at,
             period=period_meta,
+            period_context=period_context,
         )
         subject = subject_line([report_type], generated, market)
         day = generated.strftime("%Y%m%d")

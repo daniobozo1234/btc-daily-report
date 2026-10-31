@@ -116,6 +116,40 @@ def log_sent(report_types: list[str], subject: str, provider_id: str | None) -> 
         )
 
 
+def articles_in_window(start: datetime, end: datetime, *, limit: int = 60) -> list[dict[str, Any]]:
+    """Artykuły z bazy z published_at lub fetched_at w oknie okresu."""
+    init_db()
+    start_s = start.astimezone(timezone.utc).isoformat()
+    end_s = end.astimezone(timezone.utc).isoformat()
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT title, link, source, category, lang, summary, published_at, fetched_at
+            FROM articles
+            WHERE COALESCE(published_at, fetched_at) >= ?
+              AND COALESCE(published_at, fetched_at) <= ?
+            ORDER BY COALESCE(published_at, fetched_at) DESC
+            LIMIT ?
+            """,
+            (start_s, end_s, limit),
+        ).fetchall()
+    out: list[dict[str, Any]] = []
+    for title, link, source, category, lang, summary, published_at, fetched_at in rows:
+        out.append(
+            {
+                "title": title,
+                "link": link,
+                "source": source,
+                "category": category,
+                "lang": lang,
+                "summary": (summary or "")[:400],
+                "published_at": published_at or fetched_at,
+                "is_wrap": False,
+            }
+        )
+    return out
+
+
 def period_market_summary(start: datetime, end: datetime) -> dict[str, Any]:
     """Min/max/start/end BTC(+ETH) z lokalnych snapshotów w oknie okresu."""
     init_db()

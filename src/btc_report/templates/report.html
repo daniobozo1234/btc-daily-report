@@ -45,7 +45,7 @@
     <h1>{{ titles }}</h1>
     <p class="muted">Wygenerowano: {{ generated_at }} · <a href="archiwum.html">archiwum dni</a></p>
     {% if period and period.start_pl and period.end_pl and period.type != 'daily' %}
-    <p class="note">Zakres analizy: <b>{{ period.start_pl }}</b> → <b>{{ period.end_pl }}</b> ({{ period.label_pl }}).</p>
+    <p class="note">Zakres analizy: <b>{{ period.start_pl }}</b> → <b>{{ period.end_pl }}</b> ({{ period.label_pl }}). To osobne podsumowanie okresu — nie kopia raportu dziennego.</p>
     {% endif %}
 
     {% if analysis.ai_enabled %}
@@ -54,7 +54,23 @@
     <p class="note">AI niepełne — sprawdź GROQ_API_KEY / limity.{% if analysis.error %}<br />{{ analysis.error }}{% endif %}</p>
     {% endif %}
 
-    <h2>Cena i kursy</h2>
+    {% if is_period_report %}
+    {% set pp = analysis.price_path or period_context.price_path or {} %}
+    <h2>Trajektoria okresu</h2>
+    <div class="grid">
+      <div class="kpi"><span>BTC start</span><b>{{ fmt_num(pp.get('btc_start')) }}</b></div>
+      <div class="kpi"><span>BTC koniec</span><b>{{ fmt_num(pp.get('btc_end')) }}</b></div>
+      <div class="kpi"><span>BTC min</span><b>{{ fmt_num(pp.get('btc_min')) }}</b></div>
+      <div class="kpi"><span>BTC max</span><b>{{ fmt_num(pp.get('btc_max')) }}</b></div>
+      <div class="kpi"><span>BTC zmiana w okresie</span><b>{{ fmt_pct(pp.get('btc_change_pct')) }}</b></div>
+      <div class="kpi"><span>ETH zmiana w okresie</span><b>{{ fmt_pct(pp.get('eth_change_pct')) }}</b></div>
+    </div>
+    {% if analysis.trajektoria %}
+    <div class="outlook"><p>{{ analysis.trajektoria }}</p></div>
+    {% endif %}
+    {% endif %}
+
+    <h2>{% if is_period_report %}Cena na koniec okresu{% else %}Cena i kursy{% endif %}</h2>
     <h3>Bitcoin (BTC)</h3>
     <div class="grid">
       <div class="kpi"><span>BTC / USD</span><b>{{ fmt_num(market.btc_usd) }}</b></div>
@@ -149,6 +165,17 @@
     {% endif %}
     <p class="src">{{ market.etf_flow_note or '' }}</p>
 
+    {% if is_period_report %}
+    <h2>Przepływy — kontekst na koniec okresu</h2>
+    <p class="muted">Skrót netflow (snapshot). Pełna interpretacja okresu jest w sekcji AI — nie kopiujemy tu raportu dziennego.</p>
+    <div class="grid">
+      <div class="kpi"><span>Net 24h</span><b>{% if whales.net_24h_btc is not none %}{{ '%+.1f'|format(whales.net_24h_btc) }} BTC{% else %}—{% endif %}</b></div>
+      <div class="kpi"><span>Net 7d</span><b>{% if whales.net_7d_btc is not none %}{{ '%+.1f'|format(whales.net_7d_btc) }} BTC{% else %}—{% endif %}</b></div>
+      <div class="kpi"><span>Bias 24h</span><b>{{ whales.bias_24h or '—' }}</b></div>
+      <div class="kpi"><span>Bias 7d</span><b>{{ whales.bias_7d or '—' }}</b></div>
+    </div>
+    {% if whales.note %}<p class="src">{{ whales.note }}</p>{% endif %}
+    {% else %}
     <h2>Duże ryby — netflow giełdowy BTC</h2>
     <p class="muted">
       Napływ BTC <b>na giełdy</b> często = większa podaż / presja sprzedaży.
@@ -250,6 +277,7 @@
       {% endfor %}
     </table>
     {% endif %}
+    {% endif %}
 
     <h2>Wykres BTC</h2>
     <p class="muted">TradingView — okresy i wskaźniki przełączasz w widgetcie.</p>
@@ -265,18 +293,41 @@
       <a class="btn" href="{{ tradingview_eth_url }}" target="_blank" rel="noopener">Otwórz TradingView ETH</a>
     </p>
 
-    <h2>{% if period and period.label_pl and period.type != 'daily' %}{{ period.label_pl }} — analiza AI{% else %}Podsumowanie rynku AI{% endif %}</h2>
+    <h2>{% if is_period_report %}{{ period.label_pl or 'Podsumowanie okresu' }} — analiza AI{% else %}Podsumowanie rynku AI{% endif %}</h2>
     {% if analysis.tytul_dnia %}
     <p><b>{{ analysis.tytul_dnia }}</b></p>
     {% endif %}
 
-    {% if analysis.glowne_watki %}
+    {% if is_period_report and analysis.kluczowe_wydarzenia %}
     <div class="outlook">
-      <h3>Główne wątki dnia</h3>
+      <h3>Kluczowe wydarzenia okresu</h3>
+      {% for e in analysis.kluczowe_wydarzenia %}
+      <div class="thread">
+        <div class="label">• {{ e.tytul or e.watek }}{% if e.kiedy %} <span class="muted">({{ e.kiedy }})</span>{% endif %}</div>
+        <div>{{ e.dlaczego_wazne or e.opis }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% elif analysis.glowne_watki %}
+    <div class="outlook">
+      <h3>{% if is_period_report %}Główne wątki okresu{% else %}Główne wątki dnia{% endif %}</h3>
       {% for w in analysis.glowne_watki %}
       <div class="thread">
         <div class="label">• {{ w.watek }}</div>
         <div>{{ w.opis }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if is_period_report and analysis.inspiracje_z_recapow %}
+    <div class="outlook">
+      <h3>Inspiracje z cudzych podsumowań</h3>
+      <p class="muted">Luźne wnioski na bazie publicznych wrap-upów / recapów — własnymi słowami, nie kopiuj-wklej.</p>
+      {% for i in analysis.inspiracje_z_recapow %}
+      <div class="thread">
+        <div class="label">• {{ i.zrodlo_lub_watek or i.zrodlo or 'recap' }}</div>
+        <div>{{ i.wniosek }}</div>
       </div>
       {% endfor %}
     </div>
@@ -355,6 +406,39 @@
     <ul>{% for r in analysis.ryzyka %}<li>{{ r }}</li>{% endfor %}</ul>
     {% endif %}
 
+    {% if is_period_report %}
+    <h2>Materiały źródłowe okresu</h2>
+    <p class="muted">Nagłówki z całego okna (archiwum + Google News). To nie są streszczenia „z wczoraj”.</p>
+    <ul>
+      {% for a in analysis.period_headlines or [] %}
+      <li>
+        <span class="article-title">{% if a.link %}<a href="{{ a.link }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}</span>
+        <span class="src"> ({{ a.source or '—' }}{% if a.published_at %} · {{ a.published_at[:10] }}{% endif %})</span>
+        {% if a.summary %}<span class="article-sum">{{ a.summary }}</span>{% endif %}
+      </li>
+      {% else %}
+      <li class="muted">Brak nagłówków okresu.</li>
+      {% endfor %}
+    </ul>
+
+    {% if analysis.period_wraps %}
+    <h2>Cudze podsumowania okresu (inspiracje)</h2>
+    <p class="muted">Publiczne weekly/monthly wrap — używane jako kontekst, nie kopiowane 1:1.</p>
+    <ul>
+      {% for a in analysis.period_wraps %}
+      <li>
+        <span class="article-title">{% if a.link %}<a href="{{ a.link }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}</span>
+        <span class="src"> ({{ a.source or '—' }})</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if analysis.tematy_dyskusji or forum_block.hot_topics %}
+    <h2>Tematy dyskusji w okresie</h2>
+    <p>{% for t in (analysis.tematy_dyskusji or forum_block.hot_topics) %}<span class="pill">{{ t }}</span>{% endfor %}</p>
+    {% endif %}
+    {% else %}
     <h2>Newsy krypto (PL)</h2>
     <p class="muted">RSS branżowe — BTC, ETH i szerszy rynek krypto (nie tylko Bitcoin).</p>
     <ul>
@@ -420,12 +504,13 @@
       <li class="muted">Brak wątków.</li>
       {% endfor %}
     </ul>
+    {% endif %}
 
     <h2>Źródła</h2>
     <ul class="src">
-      <li>CoinGecko (BTC/ETH + top 10), NBP, alternative.me, mempool.space, Yahoo (^TNX)</li>
+      <li>CoinGecko (BTC/ETH + top 10 / OHLC okresu), NBP, alternative.me, mempool.space, Yahoo (^TNX)</li>
       <li>XOOMAR ETF flows (+ fallback Farside), CryptoDataAPI exchange netflow</li>
-      <li>RSS z config.yaml, BitcoinTalk, TradingView</li>
+      <li>RSS z config.yaml, BitcoinTalk, TradingView{% if is_period_report %}, Google News (wydarzenia + cudze wrapy okresu){% endif %}</li>
     </ul>
   </div>
 

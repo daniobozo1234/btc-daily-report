@@ -125,12 +125,14 @@ def build_brief(
     whales: dict[str, Any] | None = None,
     period: dict[str, Any] | None = None,
     period_history: dict[str, Any] | None = None,
+    period_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     whales = whales or {}
     return {
         "report_types": report_types,
         "period": period or {},
         "period_history": period_history or {},
+        "period_context": period_context or {},
         "market": {
             k: market.get(k)
             for k in (
@@ -500,6 +502,227 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
     out["crypto_pl"] = _fill_missing(out["crypto_pl"], pl_all, kind="pl")
     out["crypto_en"] = _fill_missing(out["crypto_en"], en_all, kind="en")
     return out
+
+
+def analyze_period(brief: dict[str, Any]) -> dict[str, Any]:
+    """Osobna ścieżka AI dla weekly/monthly/… — nie kopia daily news."""
+    if not _resolve_ai():
+        return _period_fallback(brief)
+
+    news_model = cfg.env("AI_MODEL_NEWS") or "qwen/qwen3.8-27b"
+    base_model = cfg.env("AI_MODEL") or "openai/gpt-oss-20b"
+    period = brief.get("period") or {}
+    primary = (brief.get("report_types") or ["monthly"])[0]
+    pctx = brief.get("period_context") or {}
+    price = pctx.get("price_path") or brief.get("period_history") or {}
+    focus = _period_focus_instruction(primary, period)
+
+    def _slim_arts(items: list[dict], n: int = 18) -> list[dict]:
+        out = []
+        for a in items[:n]:
+            out.append(
+                {
+                    "title": (a.get("title") or "")[:160],
+                    "source": a.get("source"),
+                    "published_at": a.get("published_at"),
+                    "summary": (a.get("summary") or "")[:220],
+                    "is_wrap": bool(a.get("is_wrap")),
+                }
+            )
+        return out
+
+    ctx = {
+        "report_type": primary,
+        "period": period,
+        "price_path": {
+            k: price.get(k)
+            for k in (
+                "btc_start",
+                "btc_end",
+                "btc_min",
+                "btc_max",
+                "btc_change_pct",
+                "eth_start",
+                "eth_end",
+                "eth_change_pct",
+                "samples",
+                "source",
+                "note",
+            )
+        },
+        "whales": {
+            k: (brief.get("whales") or {}).get(k)
+            for k in ("net_24h_btc", "net_7d_btc", "bias_24h", "bias_7d", "note")
+        },
+        "market_now": {
+            k: (brief.get("market") or {}).get(k)
+            for k in (
+                "btc_usd",
+                "eth_usd",
+                "fear_greed",
+                "fear_greed_label",
+                "btc_dominance_pct",
+                "etf_latest_flow_musd",
+                "us10y_yield",
+            )
+        },
+        "wydarzenia_i_newsy_okresu": _slim_arts(pctx.get("period_headlines") or [], 22),
+        "cudze_recapy_okresu": _slim_arts(pctx.get("period_wraps") or [], 10),
+        "archiwum_lokalne": _slim_arts(pctx.get("archived_articles") or [], 12),
+    }
+    ctx_json = json.dumps(ctx, ensure_ascii=False)
+
+    def _part(label: str, system: str, user: str) -> dict:
+        print(f"  · {label}…")
+        time.sleep(22)
+        part = _chat_json(system, user, model_override=news_model, max_tokens=900, force_json=False) or {}
+        if not part:
+            time.sleep(18)
+            part = _chat_json(system, user, model_override=base_model, max_tokens=900, force_json=False) or {}
+        return part
+
+    part1 = _part(
+        f"AI okres 1/3 — wydarzenia ({primary})",
+        "Jesteś polskim analitykiem rynku krypto. TYLKO JSON, po polsku. "
+        + focus
+        + " Wybierz 5-8 NAJWAŻNIEJSZYCH wydarzeń CAŁEGO okresu (nie tylko ostatniego dnia). "
+        "Hacki giełd, ETF, regulacje, duże ruchy ceny mają pierwszeństwo. "
+        "Możesz inspirować się cudzymi recapami z briefu (cudze_recapy_okresu), ale pisz własnymi słowami. "
+        "Schema: "
+        '{"tytul_dnia":"tytuł całego okresu",'
+        '"kluczowe_wydarzenia":[{"tytul":"...","kiedy":"...","dlaczego_wazne":"2-3 zdania"}],'
+        '"inspiracje_z_recapow":[{"zrodlo_lub_watek":"...","wniosek":"1-2 zdania"}]}',
+        "Zbriefu wypisz kluczowe wydarzenia i wnioski z cudzych podsumowań:\n" + ctx_json,
+    )
+    part2 = _part(
+        f"AI okres 2/3 — trajektoria i obraz ({primary})",
+        "Jesteś polskim analitykiem BTC. TYLKO JSON, po polsku. "
+        + focus
+        + " Użyj price_path (start/min/max/koniec). Schema: "
+        '{"trajektoria":"3-5 zdań o cenie BTC/ETH w okresie",'
+        '"obraz_rynku":"4-6 zdań synteza okresu",'
+        '"makro_a_btc":"3-4 zdania",'
+        '"wieloryby":"2-4 zdania o przepływach w kontekście okresu",'
+        '"tematy_dyskusji":["temat forów/społeczności 1","…"]}',
+        "Opisz trajektorię i obraz całego okresu:\n" + ctx_json,
+    )
+    part3 = _part(
+        f"AI okres 3/3 — wnioski ({primary})",
+        "Jesteś polskim analitykiem BTC. TYLKO JSON, po polsku. "
+        + focus
+        + " Schema: "
+        '{"scenariusze_btc":{"bazowy":"...","optymistyczny":"...","pesymistyczny":"..."},'
+        '"na_radarze":["..."],"ryzyka":["..."],"wnioski":["..."]}',
+        "Wnioski i scenariusze NA BAZIE całego okresu (nie tylko dziś):\n" + ctx_json,
+    )
+
+    conclusions = {**part1, **part2, **part3}
+    if part3.get("scenariusze_btc"):
+        conclusions["scenariusze_btc"] = part3["scenariusze_btc"]
+
+    # mapowanie na pola szablonu + pola okresowe
+    glowne = conclusions.get("kluczowe_wydarzenia") or conclusions.get("glowne_watki") or []
+    if glowne and isinstance(glowne[0], dict) and "watek" not in glowne[0]:
+        glowne = [
+            {
+                "watek": x.get("tytul") or x.get("watek") or "wydarzenie",
+                "opis": " ".join(
+                    p for p in [x.get("kiedy") and f"({x.get('kiedy')})", x.get("dlaczego_wazne") or x.get("opis")] if p
+                ),
+            }
+            for x in glowne
+            if isinstance(x, dict)
+        ]
+
+    out = _normalize(
+        {
+            "tytul_dnia": conclusions.get("tytul_dnia") or conclusions.get("tytul_okresu") or period.get("label_pl") or "",
+            "glowne_watki": glowne,
+            "trendy_rynku": conclusions.get("trendy_rynku") or [],
+            "makro_a_btc": conclusions.get("makro_a_btc") or "",
+            "wieloryby": conclusions.get("wieloryby") or "",
+            "obraz_rynku": conclusions.get("obraz_rynku") or conclusions.get("trajektoria") or "",
+            "scenariusze_btc": conclusions.get("scenariusze_btc") or {},
+            "na_radarze": conclusions.get("na_radarze") or [],
+            "wnioski": conclusions.get("wnioski") or [],
+            "ryzyka": conclusions.get("ryzyka") or [],
+            "crypto_pl": [],
+            "crypto_en": [],
+            "macro": [],
+            "forum": {
+                "overall": "",
+                "hot_topics": conclusions.get("tematy_dyskusji") or [],
+                "cold_or_fading": [],
+                "summaries": [],
+            },
+        },
+        brief,
+    )
+    out["is_period_report"] = True
+    out["trajektoria"] = conclusions.get("trajektoria") or ""
+    out["kluczowe_wydarzenia"] = conclusions.get("kluczowe_wydarzenia") or []
+    out["inspiracje_z_recapow"] = conclusions.get("inspiracje_z_recapow") or []
+    out["tematy_dyskusji"] = conclusions.get("tematy_dyskusji") or []
+    out["period_headlines"] = (pctx.get("period_headlines") or [])[:15]
+    out["period_wraps"] = (pctx.get("period_wraps") or [])[:8]
+    out["price_path"] = price
+    out["ai_enabled"] = True
+    resolved = _resolve_ai()
+    assert resolved
+    _, base, _ = resolved
+    out["ai_provider"] = "groq" if "groq.com" in base else "openrouter"
+    out["ai_model"] = news_model
+    return out
+
+
+def _period_fallback(brief: dict[str, Any]) -> dict[str, Any]:
+    period = brief.get("period") or {}
+    pctx = brief.get("period_context") or {}
+    price = pctx.get("price_path") or brief.get("period_history") or {}
+    heads = pctx.get("period_headlines") or []
+    events = [
+        {
+            "tytul": h.get("title"),
+            "kiedy": (h.get("published_at") or "")[:10],
+            "dlaczego_wazne": (h.get("summary") or "Wydarzenie z okresu — AI niedostępne, surowy tytuł."),
+        }
+        for h in heads[:6]
+    ]
+    chg = price.get("btc_change_pct")
+    traj = (
+        f"BTC w okresie: {price.get('btc_start')} → {price.get('btc_end')} USD "
+        f"(min {price.get('btc_min')}, max {price.get('btc_max')}, zmiana {chg}%)."
+        if price.get("btc_start")
+        else "Brak pełnej trajektorii ceny."
+    )
+    return {
+        "ai_enabled": False,
+        "is_period_report": True,
+        "tytul_dnia": period.get("label_pl") or "Podsumowanie okresu",
+        "glowne_watki": [
+            {"watek": e.get("tytul"), "opis": e.get("dlaczego_wazne")} for e in events if e.get("tytul")
+        ],
+        "kluczowe_wydarzenia": events,
+        "inspiracje_z_recapow": [],
+        "trajektoria": traj,
+        "obraz_rynku": traj,
+        "makro_a_btc": "",
+        "wieloryby": (brief.get("whales") or {}).get("note") or "",
+        "trendy_rynku": [],
+        "scenariusze_btc": {},
+        "na_radarze": [],
+        "wnioski": [traj],
+        "ryzyka": [],
+        "tematy_dyskusji": [],
+        "forum": {"overall": "", "hot_topics": [], "summaries": []},
+        "crypto_pl": [],
+        "crypto_en": [],
+        "macro": [],
+        "period_headlines": heads[:15],
+        "period_wraps": (pctx.get("period_wraps") or [])[:8],
+        "price_path": price,
+        "error": "Brak AI — surowy digest okresu.",
+    }
 
 
 def merge_enriched_articles(
