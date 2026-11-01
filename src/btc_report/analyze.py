@@ -517,19 +517,40 @@ def analyze_period(brief: dict[str, Any]) -> dict[str, Any]:
     price = pctx.get("price_path") or brief.get("period_history") or {}
     focus = _period_focus_instruction(primary, period)
 
-    def _slim_arts(items: list[dict], n: int = 18) -> list[dict]:
+    def _slim_arts(items: list[dict], n: int = 18, *, excerpt_chars: int = 220) -> list[dict]:
         out = []
         for a in items[:n]:
+            body = a.get("excerpt") or a.get("summary") or ""
             out.append(
                 {
                     "title": (a.get("title") or "")[:160],
                     "source": a.get("source"),
                     "published_at": a.get("published_at"),
-                    "summary": (a.get("summary") or "")[:220],
+                    "summary": body[:excerpt_chars],
                     "is_wrap": bool(a.get("is_wrap")),
                 }
             )
         return out
+
+    # najpierw: polskie tytuły/streszczenia materiałów okresu (nie zostawiaj EN)
+    print(f"  · AI okres — tłumaczenie materiałów ({primary})…")
+    time.sleep(18)
+    translate_batch = {
+        "headlines": _slim_arts(pctx.get("period_headlines") or [], 16),
+        "wraps": _slim_arts(pctx.get("period_wraps") or [], 8, excerpt_chars=500),
+    }
+    translated = _chat_json(
+        "Jesteś polskim redaktorem krypto. TYLKO JSON, całość po polsku. "
+        "Dla każdego elementu zwróć title_pl i summary_pl (2-3 pełne zdania). "
+        "Schema: {\"headlines\":[{\"title\":\"oryginał\",\"title_pl\":\"...\",\"summary_pl\":\"...\"}],"
+        "\"wraps\":[{\"title\":\"oryginał\",\"title_pl\":\"...\",\"summary_pl\":\"...\"}]}",
+        "Przetłumacz / streść materiały z całego okresu (nie tylko z ostatniego dnia):\n"
+        + json.dumps(translate_batch, ensure_ascii=False),
+        model_override=news_model,
+        max_tokens=1200,
+        force_json=False,
+    ) or {}
+    time.sleep(20)
 
     ctx = {
         "report_type": primary,
@@ -566,8 +587,8 @@ def analyze_period(brief: dict[str, Any]) -> dict[str, Any]:
                 "us10y_yield",
             )
         },
-        "wydarzenia_i_newsy_okresu": _slim_arts(pctx.get("period_headlines") or [], 22),
-        "cudze_recapy_okresu": _slim_arts(pctx.get("period_wraps") or [], 10),
+        "wydarzenia_i_newsy_okresu": translated.get("headlines") or _slim_arts(pctx.get("period_headlines") or [], 22),
+        "cudze_recapy_okresu": translated.get("wraps") or _slim_arts(pctx.get("period_wraps") or [], 10, excerpt_chars=500),
         "archiwum_lokalne": _slim_arts(pctx.get("archived_articles") or [], 12),
     }
     ctx_json = json.dumps(ctx, ensure_ascii=False)
@@ -582,23 +603,26 @@ def analyze_period(brief: dict[str, Any]) -> dict[str, Any]:
         return part
 
     part1 = _part(
-        f"AI okres 1/3 — wydarzenia ({primary})",
+        f"AI okres 1/3 — wydarzenia + synteza wrapów ({primary})",
         "Jesteś polskim analitykiem rynku krypto. TYLKO JSON, po polsku. "
         + focus
-        + " Wybierz 5-8 NAJWAŻNIEJSZYCH wydarzeń CAŁEGO okresu (nie tylko ostatniego dnia). "
+        + " Wybierz 5-8 NAJWAŻNIEJSZYCH wydarzeń CAŁEGO okresu (rozłóż po dniach — nie tylko finał okresu). "
         "Hacki giełd, ETF, regulacje, duże ruchy ceny mają pierwszeństwo. "
-        "Możesz inspirować się cudzymi recapami z briefu (cudze_recapy_okresu), ale pisz własnymi słowami. "
-        "Schema: "
+        "KRYTYCZNIE przeanalizuj cudze_recapy_okresu: streść ich tezy, oceń czy mają sens wobec price_path i newsów, "
+        "napisz z czym się zgadzasz / nie zgadzasz i dlaczego, potem wspólny wniosek. "
+        "Nie kopiuj cudzych tekstów — syntezuj. Schema: "
         '{"tytul_dnia":"tytuł całego okresu",'
         '"kluczowe_wydarzenia":[{"tytul":"...","kiedy":"...","dlaczego_wazne":"2-3 zdania"}],'
-        '"inspiracje_z_recapow":[{"zrodlo_lub_watek":"...","wniosek":"1-2 zdania"}]}',
-        "Zbriefu wypisz kluczowe wydarzenia i wnioski z cudzych podsumowań:\n" + ctx_json,
+        '"inspiracje_z_recapow":[{"zrodlo_lub_watek":"...","teza_autora":"1 zdanie",'
+        '"moja_ocena":"zgoda|częściowo|niezgoda + 1-2 zdania uzasadnienia"}],'
+        '"synteza_z_recapami":"3-5 zdań: wspólne wnioski Twoje + cudze wrapy"}',
+        "Zbriefu: wydarzenia okresu + krytyczna synteza cudzych podsumowań:\n" + ctx_json,
     )
     part2 = _part(
         f"AI okres 2/3 — trajektoria i obraz ({primary})",
         "Jesteś polskim analitykiem BTC. TYLKO JSON, po polsku. "
         + focus
-        + " Użyj price_path (start/min/max/koniec). Schema: "
+        + " Użyj price_path (start/min/max/koniec) i uwzględnij syntezę z wrapów jeśli pasuje. Schema: "
         '{"trajektoria":"3-5 zdań o cenie BTC/ETH w okresie",'
         '"obraz_rynku":"4-6 zdań synteza okresu",'
         '"makro_a_btc":"3-4 zdania",'
@@ -610,10 +634,10 @@ def analyze_period(brief: dict[str, Any]) -> dict[str, Any]:
         f"AI okres 3/3 — wnioski ({primary})",
         "Jesteś polskim analitykiem BTC. TYLKO JSON, po polsku. "
         + focus
-        + " Schema: "
+        + " Wnioski mają łączyć TWOJE odczyty z tym, co powtarzało się w cudzych wrapach. Schema: "
         '{"scenariusze_btc":{"bazowy":"...","optymistyczny":"...","pesymistyczny":"..."},'
         '"na_radarze":["..."],"ryzyka":["..."],"wnioski":["..."]}',
-        "Wnioski i scenariusze NA BAZIE całego okresu (nie tylko dziś):\n" + ctx_json,
+        "Wnioski i scenariusze NA BAZIE całego okresu + zbieżności z cudzymi recapami:\n" + ctx_json,
     )
 
     conclusions = {**part1, **part2, **part3}
@@ -662,9 +686,29 @@ def analyze_period(brief: dict[str, Any]) -> dict[str, Any]:
     out["trajektoria"] = conclusions.get("trajektoria") or ""
     out["kluczowe_wydarzenia"] = conclusions.get("kluczowe_wydarzenia") or []
     out["inspiracje_z_recapow"] = conclusions.get("inspiracje_z_recapow") or []
+    out["synteza_z_recapami"] = conclusions.get("synteza_z_recapami") or ""
     out["tematy_dyskusji"] = conclusions.get("tematy_dyskusji") or []
-    out["period_headlines"] = (pctx.get("period_headlines") or [])[:15]
-    out["period_wraps"] = (pctx.get("period_wraps") or [])[:8]
+    # materiały po polsku jeśli tłumaczenie się udało
+    pl_heads = translated.get("headlines") or []
+    by_title = {(x.get("title") or ""): x for x in pl_heads if isinstance(x, dict)}
+    period_heads = []
+    for a in (pctx.get("period_headlines") or [])[:18]:
+        item = dict(a)
+        tr = by_title.get(a.get("title") or "") or {}
+        item["title_pl"] = tr.get("title_pl") or item.get("title")
+        item["summary_pl"] = tr.get("summary_pl") or item.get("summary") or item.get("excerpt")
+        period_heads.append(item)
+    out["period_headlines"] = period_heads
+    pl_wraps = translated.get("wraps") or []
+    by_w = {(x.get("title") or ""): x for x in pl_wraps if isinstance(x, dict)}
+    period_wraps = []
+    for a in (pctx.get("period_wraps") or [])[:8]:
+        item = dict(a)
+        tr = by_w.get(a.get("title") or "") or {}
+        item["title_pl"] = tr.get("title_pl") or item.get("title")
+        item["summary_pl"] = tr.get("summary_pl") or item.get("summary") or item.get("excerpt")
+        period_wraps.append(item)
+    out["period_wraps"] = period_wraps
     out["price_path"] = price
     out["ai_enabled"] = True
     resolved = _resolve_ai()

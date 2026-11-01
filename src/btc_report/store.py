@@ -74,14 +74,16 @@ def save_articles(articles: list[dict[str, Any]]) -> None:
     now = _now()
     with connect() as conn:
         for a in articles:
+            # Nie nadpisuj fetched_at przy konflikcie — inaczej cały archiwum
+            # „przesuwa się” na dziś i tygodniówka wygląda jak daily.
             conn.execute(
                 """
                 INSERT INTO articles (fetched_at, link, title, source, category, lang, summary, published_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(link) DO UPDATE SET
-                    fetched_at=excluded.fetched_at,
                     title=excluded.title,
-                    summary=excluded.summary
+                    summary=COALESCE(excluded.summary, articles.summary),
+                    published_at=COALESCE(articles.published_at, excluded.published_at)
                 """,
                 (
                     now,
@@ -117,7 +119,7 @@ def log_sent(report_types: list[str], subject: str, provider_id: str | None) -> 
 
 
 def articles_in_window(start: datetime, end: datetime, *, limit: int = 60) -> list[dict[str, Any]]:
-    """Artykuły z bazy z published_at lub fetched_at w oknie okresu."""
+    """Artykuły z bazy w oknie okresu — preferuj published_at, próbkuj po dniach."""
     init_db()
     start_s = start.astimezone(timezone.utc).isoformat()
     end_s = end.astimezone(timezone.utc).isoformat()
@@ -128,14 +130,15 @@ def articles_in_window(start: datetime, end: datetime, *, limit: int = 60) -> li
             FROM articles
             WHERE COALESCE(published_at, fetched_at) >= ?
               AND COALESCE(published_at, fetched_at) <= ?
-            ORDER BY COALESCE(published_at, fetched_at) DESC
-            LIMIT ?
+            ORDER BY COALESCE(published_at, fetched_at) ASC
             """,
-            (start_s, end_s, limit),
+            (start_s, end_s),
         ).fetchall()
-    out: list[dict[str, Any]] = []
+    by_day: dict[str, list[dict[str, Any]]] = {}
     for title, link, source, category, lang, summary, published_at, fetched_at in rows:
-        out.append(
+        when = published_at or fetched_at or ""
+        day = when[:10] or "unknown"
+        by_day.setdefault(day, []).append(
             {
                 "title": title,
                 "link": link,
@@ -143,11 +146,21 @@ def articles_in_window(start: datetime, end: datetime, *, limit: int = 60) -> li
                 "category": category,
                 "lang": lang,
                 "summary": (summary or "")[:400],
-                "published_at": published_at or fetched_at,
+                "published_at": when,
                 "is_wrap": False,
             }
         )
-    return out
+    # równomiernie z każdego dnia, żeby nie brać tylko „ostatniego dnia”
+    days = sorted(by_day.keys())
+    if not days:
+        return []
+    per_day = max(1, limit // max(len(days), 1))
+    out: list[dict[str, Any]] = []
+    for day in days:
+        chunk = by_day[day][-per_day:]  # najnowsze z danego dnia
+        out.extend(chunk)
+    out.sort(key=lambda a: a.get("published_at") or "", reverse=True)
+    return out[:limit]
 
 
 def period_market_summary(start: datetime, end: datetime) -> dict[str, Any]:

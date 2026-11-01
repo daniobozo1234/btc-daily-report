@@ -3,7 +3,7 @@ from __future__ import annotations
 """Kontekst pod raporty weekly/monthly/quarterly/yearly — nie kopia daily."""
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import quote_plus
@@ -11,6 +11,7 @@ from urllib.parse import quote_plus
 import feedparser
 
 from btc_report import store
+from btc_report.fetch_articles import enrich_with_excerpts
 from btc_report.fetch_market import fetch_ohlc
 from btc_report.fetch_news import strip_html
 from btc_report.http_client import get_text
@@ -27,8 +28,11 @@ def collect_period_context(win: ReportWindow) -> dict[str, Any]:
     headlines = [a for a in external if not a.get("is_wrap")]
 
     # dedupe po tytule/linku — archiwum lokalne + zewnętrzne
-    merged = _dedupe([*archived, *headlines], limit=40)
+    merged = _dedupe([*archived, *headlines], limit=48)
     wrap_merged = _dedupe(wraps, limit=12)
+    # dociągnij treść cudzych wrapów — AI ma się na nich oprzeć, nie tylko na tytule
+    print(f"  · dociągam treść {min(6, len(wrap_merged))} cudzych podsumowań…")
+    wrap_merged = enrich_with_excerpts(wrap_merged, limit=6)
 
     return {
         "days": days,
@@ -95,32 +99,43 @@ def _price_path(*, days: int, start: datetime, end: datetime) -> dict[str, Any]:
 
 
 def _fetch_period_headlines(win: ReportWindow) -> list[dict[str, Any]]:
-    label = {
-        "weekly": "week",
-        "monthly": "month",
-        "quarterly": "quarter",
-        "yearly": "year",
-    }.get(win.report_type, "month")
     when = _google_when(win)
     month_name = win.start.strftime("%B %Y")
 
     queries = [
         (f"bitcoin OR crypto OR ethereum when:{when}", False),
-        (f"Binance hack OR crypto theft OR exploit when:{when}", False),
+        (f"Binance hack OR crypto theft OR exploit OR ETF when:{when}", False),
         (
             f'(crypto OR bitcoin) ("week in review" OR "monthly recap" OR "month in review" '
-            f'OR wrap-up OR "monthly wrap" OR podsumowanie) when:{when}',
+            f'OR wrap-up OR "monthly wrap" OR podsumowanie OR "weekly recap") when:{when}',
             True,
         ),
         (f"bitcoin {month_name} recap OR review OR podsumowanie", True),
     ]
     if win.report_type == "weekly":
         queries.append((f'bitcoin "this week" OR "week in review" when:{when}', True))
+        # rozłóż zapytania po dniach tygodnia — mniej biasu na „dziś”
+        cur = win.start.date()
+        end_d = win.end.date()
+        while cur <= end_d:
+            ds = cur.isoformat()
+            nxt = (cur + timedelta(days=1)).isoformat()
+            queries.append((f"bitcoin OR crypto after:{ds} before:{nxt}", False))
+            cur = cur + timedelta(days=1)
 
     out: list[dict[str, Any]] = []
     for q, is_wrap in queries:
-        out.extend(_google_news_rss(q, is_wrap=is_wrap, limit=10))
-    return out
+        out.extend(_google_news_rss(q, is_wrap=is_wrap, limit=8 if "after:" in q else 10))
+    # filtruj do okna dat jeśli mamy published_at
+    start_s = win.start.astimezone(timezone.utc).isoformat()
+    end_s = win.end.astimezone(timezone.utc).isoformat()
+    filtered = []
+    for a in out:
+        pub = a.get("published_at") or ""
+        if pub and (pub < start_s or pub > end_s):
+            continue
+        filtered.append(a)
+    return filtered or out
 
 
 def _google_when(win: ReportWindow) -> str:

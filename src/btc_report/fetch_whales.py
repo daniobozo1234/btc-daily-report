@@ -96,11 +96,12 @@ def fetch_whale_flows() -> WhaleSnapshot:
 def _fetch_cryptodataapi(now: str) -> WhaleSnapshot:
     key = cfg.env("CRYPTODATAAPI_KEY")
     if not key:
+        print("! Brak CRYPTODATAAPI_KEY — netflow giełdowy pusty (w GitHub Actions dodaj sekret o tej nazwie).")
         return WhaleSnapshot(
             fetched_at=now,
             source="none",
-            note="Brak CRYPTODATAAPI_KEY w .env — netflow giełdowy wyłączony (zostają inne źródła jeśli są).",
-            coverage_note="Dodaj CRYPTODATAAPI_KEY, aby zobaczyć netflow per giełda.",
+            note="Brak CRYPTODATAAPI_KEY — netflow giełdowy wyłączony. W Actions: Settings → Secrets → CRYPTODATAAPI_KEY.",
+            coverage_note="Bez kluca CryptoDataAPI sekcja „grube ryby” nie ma liczb netflow (zostaje ewentualnie mempool / Whale Alert).",
         )
 
     headers = {"X-API-Key": key, "User-Agent": "btc-daily-report/1.0"}

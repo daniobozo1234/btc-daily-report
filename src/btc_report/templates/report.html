@@ -470,14 +470,19 @@
 
     {% if is_period_report and analysis.inspiracje_z_recapow %}
     <div class="outlook">
-      <h3>Inspiracje z cudzych podsumowań</h3>
-      <p class="muted">Luźne wnioski na bazie publicznych wrap-upów / recapów — własnymi słowami, nie kopiuj-wklej.</p>
+      <h3>Cudze podsumowania — tezy i nasza ocena</h3>
+      <p class="muted">Bierzemy publiczne wrapy pod lupę: co mówią, czy ma sens, gdzie się zgadzamy.</p>
       {% for i in analysis.inspiracje_z_recapow %}
       <div class="thread">
         <div class="label">• {{ i.zrodlo_lub_watek or i.zrodlo or 'recap' }}</div>
-        <div>{{ i.wniosek }}</div>
+        {% if i.teza_autora %}<div><b>Teza:</b> {{ i.teza_autora }}</div>{% endif %}
+        {% if i.moja_ocena %}<div><b>Ocena:</b> {{ i.moja_ocena }}</div>{% endif %}
+        {% if i.wniosek and not i.moja_ocena %}<div>{{ i.wniosek }}</div>{% endif %}
       </div>
       {% endfor %}
+      {% if analysis.synteza_z_recapami %}
+      <p style="margin-top:12px"><b>Wspólne wnioski:</b> {{ analysis.synteza_z_recapami }}</p>
+      {% endif %}
     </div>
     {% endif %}
 
@@ -556,13 +561,16 @@
 
     {% if is_period_report %}
     <h2>Materiały źródłowe okresu</h2>
-    <p class="muted">Nagłówki z całego okna (archiwum + Google News). To nie są streszczenia „z wczoraj”.</p>
+    <p class="muted">Nagłówki z całego okna (archiwum + Google News), po polsku. To nie są streszczenia „z wczoraj”.</p>
     <ul>
       {% for a in analysis.period_headlines or [] %}
       <li>
-        <span class="article-title">{% if a.link %}<a href="{{ a.link }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}</span>
+        <span class="article-title">{% if a.link %}<a href="{{ a.link }}">{{ a.title_pl or a.title }}</a>{% else %}{{ a.title_pl or a.title }}{% endif %}</span>
         <span class="src"> ({{ a.source or '—' }}{% if a.published_at %} · {{ a.published_at[:10] }}{% endif %})</span>
-        {% if a.summary %}<span class="article-sum">{{ a.summary }}</span>{% endif %}
+        {% if a.title_pl and a.title and a.title_pl != a.title %}
+        <br /><span class="muted">EN: {{ a.title }}</span>
+        {% endif %}
+        {% if a.summary_pl or a.summary %}<span class="article-sum">{{ a.summary_pl or a.summary }}</span>{% endif %}
       </li>
       {% else %}
       <li class="muted">Brak nagłówków okresu.</li>
@@ -570,13 +578,14 @@
     </ul>
 
     {% if analysis.period_wraps %}
-    <h2>Cudze podsumowania okresu (inspiracje)</h2>
-    <p class="muted">Publiczne weekly/monthly wrap — używane jako kontekst, nie kopiowane 1:1.</p>
+    <h2>Cudze podsumowania okresu (źródła syntezy)</h2>
+    <p class="muted">Publiczne weekly/monthly wrap — AI ocenia ich tezy i łączy z własną analizą.</p>
     <ul>
       {% for a in analysis.period_wraps %}
       <li>
-        <span class="article-title">{% if a.link %}<a href="{{ a.link }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}</span>
+        <span class="article-title">{% if a.link %}<a href="{{ a.link }}">{{ a.title_pl or a.title }}</a>{% else %}{{ a.title_pl or a.title }}{% endif %}</span>
         <span class="src"> ({{ a.source or '—' }})</span>
+        {% if a.summary_pl %}<span class="article-sum">{{ a.summary_pl }}</span>{% endif %}
       </li>
       {% endfor %}
     </ul>
