@@ -284,13 +284,26 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
         time.sleep(22)
 
         print("  · AI fora (po polsku)…")
-        forum_ai = _chat_json(
-            FORUM_SYSTEM,
-            "Przeanalizuj i przetłumacz wątki forum na polski:\n"
-            + json.dumps({"forum_threads": brief.get("forum") or []}, ensure_ascii=False),
-            model_override=news_model,
-            max_tokens=900,
-        ) or {}
+        forum_payload = json.dumps({"forum_threads": brief.get("forum") or []}, ensure_ascii=False)
+        forum_ai = {}
+        if brief.get("forum"):
+            forum_ai = _chat_json(
+                FORUM_SYSTEM,
+                "Przeanalizuj i przetłumacz wątki forum na polski:\n" + forum_payload,
+                model_override=news_model,
+                max_tokens=900,
+            ) or {}
+            if not ((forum_ai.get("forum") or {}).get("summaries")):
+                print(f"  · AI fora — retry modelem {base_model}…")
+                time.sleep(28)
+                forum_ai = _chat_json(
+                    FORUM_SYSTEM,
+                    "Przeanalizuj i przetłumacz wątki forum na polski:\n" + forum_payload,
+                    model_override=base_model,
+                    max_tokens=900,
+                ) or {}
+        else:
+            print("  ! Brak wątków forów w briefie — pomijam AI fora.")
         time.sleep(22)
 
         news_pl = {
@@ -852,10 +865,22 @@ def _merge_en_by_link(base: list[dict], extra: list[dict]) -> list[dict]:
 
 
 def _forum_fallback_pl(threads: list[dict]) -> dict[str, Any]:
+    if not threads:
+        return {
+            "overall": (
+                "Brak pobranych wątków forów (BitcoinTalk niedostępny z chmury / Lemmy puste). "
+                "Sekcja wróci, gdy źródła znów odpowiedzą."
+            ),
+            "hot_topics": [],
+            "cold_or_fading": [],
+            "summaries": [],
+        }
+    sources = sorted({(t.get("source") or "forum") for t in threads if t.get("source")})
+    src_txt = ", ".join(sources) if sources else "forumów"
     return {
         "overall": (
             "Pełna narracja AI forów nie doszła (limit Groq). "
-            "Poniżej wątki z BitcoinTalk — otwórz linki; streszczenia to surowe fragmenty (mogą być po angielsku)."
+            f"Poniżej wątki z {src_txt} — otwórz linki; streszczenia to surowe fragmenty (mogą być po angielsku)."
         ),
         "hot_topics": [t.get("title") for t in threads[:4] if t.get("title")],
         "cold_or_fading": [],
