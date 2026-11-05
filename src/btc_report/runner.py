@@ -10,7 +10,7 @@ from btc_report import store
 from btc_report.analyze import analyze, analyze_period, build_brief, merge_enriched_articles
 from btc_report.charts import render_etf_bars, render_whale_netflow
 from btc_report.fetch_articles import enrich_with_excerpts
-from btc_report.fetch_forum import fetch_bitcointalk
+from btc_report.fetch_forum import fetch_forum_threads
 from btc_report.fetch_market import collect_market
 from btc_report.fetch_news import collect_articles
 from btc_report.fetch_period import collect_period_context
@@ -50,12 +50,19 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
     forum_cfg = config.get("forum") or {}
     forum = [
         t.to_dict()
-        for t in fetch_bitcointalk(
-            forum_cfg.get("bitcointalk_board_url", "https://bitcointalk.org/index.php?board=1.0"),
-            forum_cfg.get("user_agent", "btc-daily-report/1.0"),
+        for t in fetch_forum_threads(
+            board_url=forum_cfg.get("bitcointalk_board_url", "https://bitcointalk.org/index.php?board=1.0"),
+            user_agent=forum_cfg.get(
+                "user_agent",
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            ),
             limit=int((config.get("limits") or {}).get("forum_threads", 6)),
+            lemmy_communities=forum_cfg.get("lemmy_communities") or ["bitcoin", "cryptocurrency"],
+            lemmy_instance=forum_cfg.get("lemmy_instance") or "https://lemmy.world",
         )
     ]
+    print(f"  łącznie wątków forów: {len(forum)}")
     store.save_forum(forum)
 
     print("→ wykres ETF (dzień + tydzień)…")
