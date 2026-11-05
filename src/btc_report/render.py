@@ -98,6 +98,7 @@ def render_html(
     generated_at: str,
     period: dict[str, Any] | None = None,
     period_context: dict[str, Any] | None = None,
+    telegram_block: dict[str, Any] | None = None,
 ) -> str:
     titles = " + ".join(LABELS.get(t, t) for t in report_types)
     period = period or {}
@@ -114,6 +115,7 @@ def render_html(
         crypto_en=articles.get("crypto_en", []),
         macro=articles.get("macro", []),
         forum_block=forum_block,
+        telegram_block=telegram_block or analysis.get("telegram") or {},
         analysis=analysis,
         tradingview_url=tradingview_url,
         tradingview_eth_url=tradingview_eth_url
