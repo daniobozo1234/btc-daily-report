@@ -45,6 +45,29 @@ Schema:
 Nie wymyślaj wątków spoza listy. Zwróć summaries dla wszystkich podanych wątków.
 """
 
+TELEGRAM_SYSTEM = """Jesteś polskim analitykiem kanałów Telegram o kryptowalutach.
+Odpowiadasz WYŁĄCZNIE JSON, całość po polsku.
+Na podstawie postów z wiodących publicznych kanałów (media / on-chain) streść klimat i kluczowe sygnały.
+Nie wymyślaj postów spoza listy. Ignoruj promocje airdropów/gier jeśli wpadną.
+
+Schema:
+{
+  "telegram": {
+    "overall": "4-5 zdań: co dominuje na głównych kanałach TG dziś",
+    "hot_topics": ["krótka etykieta PL", "...", "..."],
+    "summaries": [
+      {
+        "link":"...",
+        "channel":"nazwa kanału",
+        "title_pl":"krótki polski nagłówek",
+        "summary_pl":"Dokładnie 2 pełne zdania po polsku."
+      }
+    ]
+  }
+}
+Zwróć summaries dla wszystkich podanych postów.
+"""
+
 WNIOSKI_SYSTEM = """Jesteś doświadczonym polskim analitykiem rynku Bitcoina i makroekonomii.
 Odpowiadasz WYŁĄCZNIE JSON, całość po polsku.
 Na podstawie wskaźników, newsów krypto PL/EN, makro i forów napisz ROZBUDOWANE podsumowanie rynku.
@@ -126,8 +149,10 @@ def build_brief(
     period: dict[str, Any] | None = None,
     period_history: dict[str, Any] | None = None,
     period_context: dict[str, Any] | None = None,
+    telegram: list[dict] | None = None,
 ) -> dict[str, Any]:
     whales = whales or {}
+    telegram = telegram or []
     return {
         "report_types": report_types,
         "period": period or {},
@@ -205,6 +230,16 @@ def build_brief(
             }
             for t in forum[:5]
         ],
+        "telegram": [
+            {
+                "channel": p.get("channel") or p.get("handle"),
+                "handle": p.get("handle"),
+                "link": p.get("link"),
+                "text": (p.get("text") or "")[:320],
+                "published_at": p.get("published_at"),
+            }
+            for p in telegram[:10]
+        ],
     }
 
 
@@ -220,11 +255,12 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
     en_all = brief.get("crypto_en") or []
 
     if shared_news and shared_news.get("ready"):
-        print("  · AI news/fora — używam cache z poprzedniego raportu w tej rundzie…")
+        print("  · AI news/fora/TG — używam cache z poprzedniego raportu w tej rundzie…")
         news_pl = shared_news["news_pl"]
         news_en = shared_news["news_en"]
         news_macro = shared_news["news_macro"]
         forum = shared_news["forum"]
+        telegram = shared_news.get("telegram") or _telegram_fallback_pl(brief.get("telegram") or [])
     else:
         # Groq free: niski limit output tokens/min — małe batche + max_tokens<=900
         print("  · AI news PL (1/2)…")
@@ -306,6 +342,30 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
             print("  ! Brak wątków forów w briefie — pomijam AI fora.")
         time.sleep(22)
 
+        print("  · AI Telegram (po polsku)…")
+        tg_brief = brief.get("telegram") or []
+        telegram_ai: dict[str, Any] = {}
+        if tg_brief:
+            tg_payload = json.dumps({"telegram_posts": tg_brief}, ensure_ascii=False)
+            telegram_ai = _chat_json(
+                TELEGRAM_SYSTEM,
+                "Streść i przeanalizuj posty z głównych kanałów Telegram:\n" + tg_payload,
+                model_override=news_model,
+                max_tokens=900,
+            ) or {}
+            if not ((telegram_ai.get("telegram") or {}).get("summaries")):
+                print(f"  · AI Telegram — retry modelem {base_model}…")
+                time.sleep(28)
+                telegram_ai = _chat_json(
+                    TELEGRAM_SYSTEM,
+                    "Streść i przeanalizuj posty z głównych kanałów Telegram:\n" + tg_payload,
+                    model_override=base_model,
+                    max_tokens=900,
+                ) or {}
+        else:
+            print("  ! Brak postów Telegram w briefie — pomijam AI TG.")
+        time.sleep(22)
+
         news_pl = {
             "crypto_pl": (news_pl_a.get("crypto_pl") or []) + (news_pl_b.get("crypto_pl") or [])
         }
@@ -337,6 +397,14 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
                 s["title_pl"] = s.get("title")
             s["summary_pl"] = _finish_sentence(s.get("summary_pl") or "")
 
+        telegram = (telegram_ai.get("telegram") or {}) if isinstance(telegram_ai, dict) else {}
+        if not telegram.get("summaries"):
+            telegram = _telegram_fallback_pl(brief.get("telegram") or [])
+        for s in telegram.get("summaries") or []:
+            s["summary_pl"] = _finish_sentence(s.get("summary_pl") or "")
+            if not s.get("title_pl"):
+                s["title_pl"] = (s.get("channel") or "Telegram") + " — skrót"
+
         if shared_news is not None:
             shared_news.clear()
             shared_news.update(
@@ -346,6 +414,7 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
                     "news_en": news_en,
                     "news_macro": news_macro,
                     "forum": forum,
+                    "telegram": telegram,
                 }
             )
 
@@ -392,6 +461,10 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
         "forum": {
             "overall": ((forum.get("overall") or "")[:280]),
             "hot_topics": (forum.get("hot_topics") or [])[:4],
+        },
+        "telegram": {
+            "overall": ((telegram.get("overall") or "")[:280]),
+            "hot_topics": (telegram.get("hot_topics") or [])[:4],
         },
     }
     ctx_json = json.dumps(ctx, ensure_ascii=False)
@@ -497,6 +570,7 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
             "crypto_en": news_en.get("crypto_en") or [],
             "macro": news_macro.get("macro") or [],
             "forum": forum,
+            "telegram": telegram,
             "ryzyka": conclusions.get("ryzyka") or [],
         },
         brief,
@@ -692,6 +766,7 @@ def analyze_period(brief: dict[str, Any]) -> dict[str, Any]:
                 "cold_or_fading": [],
                 "summaries": [],
             },
+            "telegram": {"overall": "", "hot_topics": [], "summaries": []},
         },
         brief,
     )
@@ -892,6 +967,39 @@ def _forum_fallback_pl(threads: list[dict]) -> dict[str, Any]:
                 "summary_pl": _finish_sentence(t.get("excerpt") or "Brak fragmentu posta."),
             }
             for t in threads
+        ],
+    }
+
+
+def _telegram_fallback_pl(posts: list[dict]) -> dict[str, Any]:
+    if not posts:
+        return {
+            "overall": (
+                "Brak świeżych postów z publicznych podglądów Telegram (t.me/s/). "
+                "Kanały mogły nie opublikować nic w oknie 72h albo podgląd był niedostępny."
+            ),
+            "hot_topics": [],
+            "summaries": [],
+        }
+    channels = []
+    for p in posts:
+        ch = p.get("channel") or p.get("handle")
+        if ch and ch not in channels:
+            channels.append(ch)
+    return {
+        "overall": (
+            "Pełna narracja AI Telegram nie doszła (limit Groq). "
+            f"Poniżej surowe skróty z: {', '.join(channels[:6])}."
+        ),
+        "hot_topics": channels[:4],
+        "summaries": [
+            {
+                "link": p.get("link"),
+                "channel": p.get("channel") or p.get("handle") or "Telegram",
+                "title_pl": (p.get("channel") or "Telegram") + " — post",
+                "summary_pl": _finish_sentence(p.get("text") or "Brak treści."),
+            }
+            for p in posts
         ],
     }
 
@@ -1333,9 +1441,12 @@ def _normalize(data: dict[str, Any], brief: dict[str, Any]) -> dict[str, Any]:
     data.setdefault("crypto_en", [])
     data.setdefault("macro", [])
     data.setdefault("forum", {})
+    data.setdefault("telegram", {})
     data.setdefault("ryzyka", [])
     if isinstance(data["forum"], str):
         data["forum"] = {"overall": data["forum"], "hot_topics": [], "cold_or_fading": [], "summaries": []}
+    if isinstance(data.get("telegram"), str):
+        data["telegram"] = {"overall": data["telegram"], "hot_topics": [], "summaries": []}
     if not isinstance(data.get("scenariusze_btc"), dict):
         data["scenariusze_btc"] = {}
     for key in ("bazowy", "optymistyczny", "pesymistyczny"):
@@ -1345,6 +1456,11 @@ def _normalize(data: dict[str, Any], brief: dict[str, Any]) -> dict[str, Any]:
     forum.setdefault("hot_topics", [])
     forum.setdefault("cold_or_fading", [])
     forum.setdefault("summaries", [])
+    telegram = data["telegram"] if isinstance(data.get("telegram"), dict) else {}
+    data["telegram"] = telegram
+    telegram.setdefault("overall", "")
+    telegram.setdefault("hot_topics", [])
+    telegram.setdefault("summaries", [])
     return data
 
 
@@ -1378,6 +1494,7 @@ def _fallback(brief: dict[str, Any]) -> dict[str, Any]:
             for a in brief.get("macro", [])
         ],
         "forum": _forum_fallback_pl(brief.get("forum") or []),
+        "telegram": _telegram_fallback_pl(brief.get("telegram") or []),
         "ryzyka": ["Analiza AI wyłączona."],
         "ai_enabled": False,
     }
