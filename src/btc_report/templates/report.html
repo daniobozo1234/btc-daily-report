@@ -661,13 +661,33 @@
       <li class="muted">Brak wątków.</li>
       {% endfor %}
     </ul>
+
+    <h2>Telegram — główne kanały publiczne</h2>
+    <p class="muted">Bez konta Telegram — publiczne podglądy t.me/s/ (media / on-chain).</p>
+    <p>{{ telegram_block.overall or 'Brak podsumowania Telegram.' }}</p>
+    {% if telegram_block.hot_topics %}
+    <h3>Tematy na TG</h3>
+    <p>{% for t in telegram_block.hot_topics %}<span class="pill">{{ t }}</span>{% endfor %}</p>
+    {% endif %}
+    <h3>Wybrane posty</h3>
+    <ul>
+      {% for t in telegram_block.summaries or [] %}
+      <li>
+        <span class="article-title"><a href="{{ t.link }}">{{ t.title_pl or t.channel or 'Post' }}</a></span>
+        {% if t.channel %}<span class="src"> ({{ t.channel }})</span>{% endif %}
+        <span class="article-sum">{{ t.summary_pl or '' }}</span>
+      </li>
+      {% else %}
+      <li class="muted">Brak świeżych postów z wybranych kanałów.</li>
+      {% endfor %}
+    </ul>
     {% endif %}
 
     <h2>Źródła</h2>
     <ul class="src">
       <li>CoinGecko (BTC/ETH + top 10 / OHLC okresu), NBP, alternative.me, mempool.space, Yahoo (^TNX)</li>
       <li>XOOMAR ETF flows (+ fallback Farside), CryptoDataAPI exchange netflow</li>
-      <li>RSS z config.yaml, BitcoinTalk, TradingView{% if is_period_report %}, Google News (wydarzenia + cudze wrapy okresu){% endif %}</li>
+      <li>RSS z config.yaml, BitcoinTalk{% if not is_period_report %}, Telegram (t.me/s/){% endif %}, TradingView{% if is_period_report %}, Google News (wydarzenia + cudze wrapy okresu){% endif %}</li>
     </ul>
   </div>
 
