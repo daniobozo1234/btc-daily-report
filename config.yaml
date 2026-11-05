@@ -82,7 +82,13 @@ rss_macro:
 
 forum:
   bitcointalk_board_url: https://bitcointalk.org/index.php?board=1.0
-  user_agent: "btc-daily-report/1.0 (+personal research bot; respectful crawl)"
+  # Browser UA — BitcoinTalk częściej puszcza; na Actions i tak bywa blokada IP
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  # Zapas gdy BTalk pusty (GitHub Actions): publiczne API Lemmy
+  lemmy_instance: https://lemmy.world
+  lemmy_communities:
+    - bitcoin
+    - cryptocurrency
 
 chart:
   daily_days: 30
