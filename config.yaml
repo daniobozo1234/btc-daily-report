@@ -9,6 +9,7 @@ limits:
   crypto_articles: 14
   macro_articles: 6
   forum_threads: 8
+  telegram_posts: 14
   per_feed: 5
 
 rss_crypto_pl:
@@ -89,6 +90,31 @@ forum:
   lemmy_communities:
     - bitcoin
     - cryptocurrency
+
+# Publiczne kanały Telegram przez t.me/s/ — BEZ konta / Bot API.
+# Tylko wiodące media/on-chain (nie mikro-eksperci, nie airdropy).
+telegram:
+  enabled: true
+  max_age_hours: 72
+  per_channel: 2
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  channels:
+    - handle: cointelegraph
+      name: Cointelegraph
+    - handle: WatcherGuru
+      name: Watcher Guru
+    - handle: Bitcoin
+      name: Bitcoin
+    - handle: glassnode
+      name: Glassnode
+    - handle: cryptoquant_official
+      name: CryptoQuant
+    - handle: TreeNewsFeed
+      name: Tree News
+    - handle: wublockchainenglish
+      name: Wu Blockchain
+    - handle: CoinBureau
+      name: Coin Bureau
 
 chart:
   daily_days: 30
