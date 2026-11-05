@@ -14,6 +14,7 @@ from btc_report.fetch_forum import fetch_forum_threads
 from btc_report.fetch_market import collect_market
 from btc_report.fetch_news import collect_articles
 from btc_report.fetch_period import collect_period_context
+from btc_report.fetch_telegram import fetch_telegram_posts
 from btc_report.fetch_whales import fetch_whale_flows
 from btc_report.mailer import send_email, subject_line
 from btc_report.periods import LABELS, detect_report_types, now_local, window_for
@@ -65,6 +66,25 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
     print(f"  łącznie wątków forów: {len(forum)}")
     store.save_forum(forum)
 
+    print("→ pobieram Telegram (publiczne t.me/s/, bez konta)…")
+    tg_cfg = config.get("telegram") or {}
+    telegram: list[dict] = []
+    if tg_cfg.get("enabled", True):
+        telegram = [
+            p.to_dict()
+            for p in fetch_telegram_posts(
+                tg_cfg.get("channels"),
+                user_agent=tg_cfg.get("user_agent")
+                or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                per_channel=int(tg_cfg.get("per_channel") or 2),
+                max_age_hours=int(tg_cfg.get("max_age_hours") or 72),
+                limit=int((config.get("limits") or {}).get("telegram_posts", 12)),
+            )
+        ]
+    else:
+        print("  · Telegram wyłączony w config.yaml")
+
     print("→ wykres ETF (dzień + tydzień)…")
     try:
         etf_chart_path = render_etf_bars(market.get("etf_flows") or [], market.get("etf_weekly") or [])
@@ -106,10 +126,12 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
                 whales=whales,
                 period=period_meta,
                 period_history=period_history,
+                telegram=telegram,
             )
             analysis = analyze(brief, shared_news=shared_news)
             articles = merge_enriched_articles(articles_raw, analysis)
             forum_block = analysis.get("forum") or {}
+            telegram_block = analysis.get("telegram") or {}
         else:
             print(f"  · zbieram kontekst okresu ({report_type})…")
             period_context = collect_period_context(win)
@@ -125,10 +147,12 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
                 period=period_meta,
                 period_history=period_history,
                 period_context=period_context,
+                telegram=[],
             )
             analysis = analyze_period(brief)
             articles = {"crypto_pl": [], "crypto_en": [], "macro": []}
             forum_block = analysis.get("forum") or {}
+            telegram_block = analysis.get("telegram") or {}
 
         generated_at = generated.isoformat(timespec="seconds")
         html = render_html(
@@ -136,6 +160,7 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
             market=market,
             articles=articles,
             forum_block=forum_block,
+            telegram_block=telegram_block,
             analysis=analysis,
             tradingview_url=config.get("tradingview_url")
             or "https://www.tradingview.com/chart/?symbol=BITSTAMP%3ABTCUSD",
