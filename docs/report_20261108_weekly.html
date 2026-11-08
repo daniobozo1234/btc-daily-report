@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Podsumowanie tygodnia</title>
+  <style>
+    :root {
+      --bg: #f5f5f7;
+      --surface: #ffffff;
+      --text: #1d1d1f;
+      --secondary: #6e6e73;
+      --hairline: rgba(0, 0, 0, 0.08);
+      --blue: #0071e3;
+      --green: #34c759;
+      --red: #ff3b30;
+      --orange: #ff9f0a;
+      --radius: 14px;
+      --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.04);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      color: var(--text);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.47;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 820px; margin: 0 auto; padding: 40px 20px 72px; }
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.022em;
+      margin: 0 0 10px;
+      line-height: 1.15;
+    }
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.016em;
+      margin: 40px 0 14px;
+      padding: 0;
+      border: none;
+    }
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 22px 0 10px;
+      color: var(--text);
+    }
+    .muted { color: var(--secondary); font-size: 0.92rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    @media (min-width: 720px) {
+      .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius);
+      padding: 16px 16px 14px;
+      box-shadow: var(--shadow);
+    }
+    .kpi b {
+      display: block;
+      margin-top: 6px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .kpi span {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    ul { padding-left: 1.15rem; margin: 0.4rem 0 0; }
+    li { margin: 0.85rem 0; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    img.chart {
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .btn {
+      display: inline-block;
+      margin: 10px 10px 10px 0;
+      padding: 11px 18px;
+      background: var(--text);
+      color: #fff !important;
+      text-decoration: none !important;
+      border-radius: 980px;
+      font-size: 0.92rem;
+      font-weight: 500;
+    }
+    .btn:hover { opacity: 0.88; }
+    .src { font-size: 0.86rem; color: var(--secondary); }
+    .article-title { font-weight: 600; }
+    .article-sum {
+      display: block;
+      margin-top: 6px;
+      color: var(--text);
+      font-size: 0.98rem;
+      line-height: 1.5;
+      opacity: 0.92;
+    }
+    .note {
+      background: rgba(0, 113, 227, 0.06);
+      border: 1px solid rgba(0, 113, 227, 0.14);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.94rem;
+      color: var(--text);
+    }
+    .pill {
+      display: inline-block;
+      background: rgba(0, 0, 0, 0.05);
+      color: var(--text);
+      padding: 5px 11px;
+      margin: 3px 5px 3px 0;
+      border-radius: 980px;
+      font-size: 0.82rem;
+      font-weight: 500;
+    }
+    .outlook {
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius);
+      padding: 18px 18px 14px;
+      margin: 12px 0;
+      box-shadow: var(--shadow);
+    }
+    .outlook h3 { margin-top: 0; }
+    .outlook p { margin: 0.45rem 0 0.7rem; }
+    .thread { margin: 0.75rem 0 1.05rem; }
+    .thread .label { font-weight: 600; }
+    .trend-up { color: var(--green); font-weight: 600; }
+    .trend-down { color: var(--red); font-weight: 600; }
+    .trend-side { color: var(--orange); font-weight: 600; }
+    #tv-widget, #tv-widget-eth {
+      width: 100%;
+      height: 520px;
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    table.top10 { font-size: 0.88rem; }
+    table.top10 td.num { text-align: right; white-space: nowrap; }
+    table.etf {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.9rem;
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    table.etf th, table.etf td {
+      border-bottom: 1px solid var(--hairline);
+      padding: 10px 12px;
+      text-align: left;
+    }
+    table.etf tr:last-child td { border-bottom: none; }
+    table.etf th {
+      background: rgba(0, 0, 0, 0.02);
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Podsumowanie tygodnia</h1>
+    <p class="muted">Wygenerowano: 2026-11-08T07:31:08+01:00 · <a href="archiwum.html">archiwum dni</a></p>
+    
+    <p class="note">Zakres analizy: <b>02.11.2026</b> → <b>08.11.2026</b> (Podsumowanie tygodnia). To osobne podsumowanie okresu — nie kopia raportu dziennego.</p>
+    
+
+    
+    <p class="muted">AI: groq / qwen/qwen3.8-27b</p>
+    
+
+    
+    
+    <h2>Trajektoria okresu</h2>
+    <div class="grid">
+      <div class="kpi"><span>BTC start</span><b>77 732.00</b></div>
+      <div class="kpi"><span>BTC koniec</span><b>75 824.00</b></div>
+      <div class="kpi"><span>BTC min</span><b>74 921.00</b></div>
+      <div class="kpi"><span>BTC max</span><b>81 004.00</b></div>
+      <div class="kpi"><span>BTC zmiana w okresie</span><b>-2.45%</b></div>
+      <div class="kpi"><span>ETH zmiana w okresie</span><b>-0.96%</b></div>
+    </div>
+    
+    <div class="outlook"><p>Tydzień przyniósł korektę cenową, przy czym Bitcoin spadł o 2,45% z poziomu 77 732 USD do 75 824 USD, a Ethereum straciło 0,96%, kończąc okres na 2 235 USD. W trakcie tygodnia rynek testował opory, osiągając szczyt 81 004 USD dla BTC, zanim presja sprzedażowa sprowadziła cenę do minimum 74 921 USD. Zmiana wolumenu i sentymentu była widoczna w drugiej połowie tygodnia, gdy oba główne aktywa utraciły zyski z początku okresu. Trajektoria sugeruje konsolidację w dołach po krótkoterminowym wybiciu, z wyraźną dominacją podaży w końcówce tygodnia.</p></div>
+    
+    
+
+    <h2>Cena na koniec okresu</h2>
+    <h3>Bitcoin (BTC)</h3>
+    <div class="grid">
+      <div class="kpi"><span>BTC / USD</span><b>75 759.00</b></div>
+      <div class="kpi"><span>BTC / EUR</span><b>67 967.00</b></div>
+      <div class="kpi"><span>BTC / PLN</span><b>298 925.00</b></div>
+      <div class="kpi"><span>USD/PLN (NBP)</span><b>3.9321</b></div>
+      <div class="kpi"><span>EUR/PLN (NBP)</span><b>4.3925</b></div>
+    </div>
+    <p class="muted" style="margin-top:12px">Zmiana <b>ceny BTC względem USD</b>:</p>
+    <div class="grid">
+      <div class="kpi"><span>BTC vs USD — 24h</span><b>-0.29%</b></div>
+      <div class="kpi"><span>BTC vs USD — 7 dni</span><b>-2.70%</b></div>
+      <div class="kpi"><span>BTC vs USD — 30 dni</span><b>-7.96%</b></div>
+    </div>
+
+    <h3>Ethereum (ETH)</h3>
+    <div class="grid">
+      <div class="kpi"><span>ETH / USD</span><b>2 232.92</b></div>
+      <div class="kpi"><span>ETH / EUR</span><b>2 003.27</b></div>
+      <div class="kpi"><span>ETH / PLN</span><b>8 810.54</b></div>
+    </div>
+    <p class="muted" style="margin-top:12px">Zmiana <b>ceny ETH względem USD</b>:</p>
+    <div class="grid">
+      <div class="kpi"><span>ETH vs USD — 24h</span><b>-0.48%</b></div>
+      <div class="kpi"><span>ETH vs USD — 7 dni</span><b>-1.56%</b></div>
+      <div class="kpi"><span>ETH vs USD — 30 dni</span><b>-10.32%</b></div>
+    </div>
+
+    <h2>Wskaźniki</h2>
+    <h3>Wspólne / makro</h3>
+    <div class="grid">
+      <div class="kpi"><span>Fear &amp; Greed</span><b>28 (Fear)</b></div>
+      <div class="kpi"><span>US 10Y</span><b>4.86%</b></div>
+      <div class="kpi"><span>Hashrate BTC</span><b>1 003.44 EH/s</b></div>
+      <div class="kpi"><span>Halving — bloki pozostałe</span><b>74970</b></div>
+      <div class="kpi"><span>Halving — ok. dni / data</span><b>521 dni · 2028-04-11</b></div>
+    </div>
+    <p class="src">Następny halving przy bloku 1050000. Zostało 74970 bloków (~521 dni, ok. 2028-04-11). Obecna wysokość: 975030.</p>
+
+    <h3>Bitcoin</h3>
+    <div class="grid">
+      <div class="kpi"><span>Volume 24h (USD)</span><b>10 422 121 703</b></div>
+      <div class="kpi"><span>Market cap (USD)</span><b>1 523 463 799 654</b></div>
+      <div class="kpi"><span>Dominacja BTC</span><b>59.32%</b></div>
+    </div>
+
+    <h3>Ethereum</h3>
+    <div class="grid">
+      <div class="kpi"><span>Volume 24h (USD)</span><b>4 048 013 868</b></div>
+      <div class="kpi"><span>Market cap (USD)</span><b>272 865 281 675</b></div>
+      <div class="kpi"><span>Dominacja ETH</span><b>10.63%</b></div>
+    </div>
+
+    
+    <h2>Top 10 kryptowalut (CoinGecko)</h2>
+    <p class="muted">Ranking wg kapitalizacji rynkowej — cena, zmiany 24h/7d, market cap, wolumen (jak na CoinGecko).</p>
+    <table class="etf top10">
+      <tr>
+        <th>#</th><th>Nazwa</th><th>Cena USD</th><th>24h</th><th>7d</th><th>Market cap</th><th>Vol 24h</th>
+      </tr>
+      
+      <tr>
+        <td>1</td>
+        <td><b>BTC</b> · Bitcoin</td>
+        <td class="num">75 759.00</td>
+        <td class="num neg">-0.29%</td>
+        <td class="num neg">-2.62%</td>
+        <td class="num">1 523 463 799 654</td>
+        <td class="num">10 422 121 703</td>
+      </tr>
+      
+      <tr>
+        <td>2</td>
+        <td><b>ETH</b> · Ethereum</td>
+        <td class="num">2 232.92</td>
+        <td class="num neg">-0.48%</td>
+        <td class="num neg">-1.47%</td>
+        <td class="num">272 865 281 675</td>
+        <td class="num">4 048 013 868</td>
+      </tr>
+      
+      <tr>
+        <td>3</td>
+        <td><b>USDT</b> · Tether</td>
+        <td class="num">1.00</td>
+        <td class="num neg">-0.01%</td>
+        <td class="num neg">-0.05%</td>
+        <td class="num">176 853 147 742</td>
+        <td class="num">18 364 270 726</td>
+      </tr>
+      
+      <tr>
+        <td>4</td>
+        <td><b>BNB</b> · BNB</td>
+        <td class="num">696.50</td>
+        <td class="num pos">+0.30%</td>
+        <td class="num neg">-1.23%</td>
+        <td class="num">91 596 777 039</td>
+        <td class="num">572 604 899</td>
+      </tr>
+      
+      <tr>
+        <td>5</td>
+        <td><b>XRP</b> · XRP</td>
+        <td class="num">1.16</td>
+        <td class="num pos">+0.03%</td>
+        <td class="num neg">-7.00%</td>
+        <td class="num">73 947 450 867</td>
+        <td class="num">992 968 010</td>
+      </tr>
+      
+      <tr>
+        <td>6</td>
+        <td><b>USDC</b> · USDC</td>
+        <td class="num">1.00</td>
+        <td class="num neg">-0.01%</td>
+        <td class="num neg">-0.05%</td>
+        <td class="num">70 476 994 558</td>
+        <td class="num">4 551 515 784</td>
+      </tr>
+      
+      <tr>
+        <td>7</td>
+        <td><b>SOL</b> · Solana</td>
+        <td class="num">89.11</td>
+        <td class="num neg">-1.06%</td>
+        <td class="num neg">-6.62%</td>
+        <td class="num">52 668 899 027</td>
+        <td class="num">829 105 161</td>
+      </tr>
+      
+      <tr>
+        <td>8</td>
+        <td><b>TRX</b> · TRON</td>
+        <td class="num">0.32</td>
+        <td class="num pos">+0.68%</td>
+        <td class="num pos">+3.70%</td>
+        <td class="num">30 439 724 629</td>
+        <td class="num">307 640 767</td>
+      </tr>
+      
+      <tr>
+        <td>9</td>
+        <td><b>FIGR_HELOC</b> · Figure Heloc</td>
+        <td class="num">1.07</td>
+        <td class="num pos">+4.24%</td>
+        <td class="num pos">+0.17%</td>
+        <td class="num">28 099 527 020</td>
+        <td class="num">3 110 121</td>
+      </tr>
+      
+      <tr>
+        <td>10</td>
+        <td><b>ZEC</b> · Zcash</td>
+        <td class="num">1 261.94</td>
+        <td class="num neg">-3.57%</td>
+        <td class="num pos">+0.95%</td>
+        <td class="num">21 490 578 591</td>
+        <td class="num">687 670 044</td>
+      </tr>
+      
+    </table>
+    
+
+    <h2>ETF BTC — zakupy / sprzedaż</h2>
+    <p class="muted">Źródło aktualne: XOOMAR (holdings emitentów). Zielone = napływ, czerwone = odpływ. Wykres: dni + tygodnie.</p>
+    
+    
+    <h3>Rozbicie ostatniego dnia (2026-11-06)</h3>
+    <table class="etf">
+      <tr><th>Ticker</th><th>Emitent</th><th>Flow (mln USD)</th></tr>
+      
+      <tr>
+        <td>ARKB</td>
+        <td>ARK 21Shares</td>
+        <td class="neg">-18.85</td>
+      </tr>
+      
+      <tr>
+        <td>BITB</td>
+        <td>Bitwise</td>
+        <td class="neg">-20.53</td>
+      </tr>
+      
+    </table>
+    
+    <p class="src">XOOMAR (darmowe API, dane z plików holdings emitentów): ostatni dzień 2026-11-06, suma IBIT+BITB+ARKB… ≈ -39.4 mln USD. Rozbicie dnia: ARKB -18.8m, BITB -20.5m. Źródło: https://xoomar.com/markets/api/etf-flows</p>
+
+    
+    <h2>Przepływy — kontekst na koniec okresu</h2>
+    <p class="muted">Skrót netflow (snapshot). Pełna interpretacja okresu jest w sekcji AI — nie kopiujemy tu raportu dziennego.</p>
+    <div class="grid">
+      <div class="kpi"><span>Net 24h</span><b>+629.5 BTC</b></div>
+      <div class="kpi"><span>Net 7d</span><b>+9273.7 BTC</b></div>
+      <div class="kpi"><span>Bias 24h</span><b>napływ na giełdy (często presja sprzedaży)</b></div>
+      <div class="kpi"><span>Bias 7d</span><b>napływ na giełdy (często presja sprzedaży)</b></div>
+    </div>
+    <p class="src">Netflow giełdowy BTC (CryptoDataAPI): 24h +629.5 BTC, 7d +9273.7 BTC. Plus = napływ NA giełdy; minus = odpływ Z giełd. Bias 24h: napływ na giełdy (często presja sprzedaży). Bias 7d: napływ na giełdy (często presja sprzedaży).</p>
+    
+
+    <h2>Wykres BTC</h2>
+    <p class="muted">TradingView — okresy i wskaźniki przełączasz w widgetcie.</p>
+    <div id="tv-widget"></div>
+    <p>
+      <a class="btn" href="https://www.tradingview.com/chart/?symbol=BITSTAMP%3ABTCUSD" target="_blank" rel="noopener">Otwórz TradingView BTC</a>
+    </p>
+
+    <h2>Wykres ETH</h2>
+    <p class="muted">TradingView — okresy i wskaźniki przełączasz w widgetcie.</p>
+    <div id="tv-widget-eth"></div>
+    <p>
+      <a class="btn" href="https://www.tradingview.com/chart/?symbol=BITSTAMP%3AETHUSD" target="_blank" rel="noopener">Otwórz TradingView ETH</a>
+    </p>
+
+    <h2>Podsumowanie tygodnia — analiza AI</h2>
+    
+    <p><b>Tydzień pod znakiem korekty: napływy na giełdy, słabość dolara i regulacje w USA</b></p>
+    
+
+    
+    <div class="outlook">
+      <h3>Kluczowe wydarzenia okresu</h3>
+      
+      <div class="thread">
+        <div class="label">• Zmiana trendu na rynku makro: słabość dolara po wyborach w USA <span class="muted">(07-08.11.2026)</span></div>
+        <div>Przejęcie Kongresu przez Demokratów w wyborach śródokresowych wywołało spadek wartości dolara i rentowności obligacji. To klasyczny sygnał, który historycznie wspiera ryzykowne aktywa, takie jak kryptowaluty, mimo że w tym tygodniu BTC i ETH spadły.</div>
+      </div>
+      
+      <div class="thread">
+        <div class="label">• Presja sprzedażowa: rekordowy napływ BTC na giełdy <span class="muted">(02-08.11.2026)</span></div>
+        <div>Netflow giełdowy wyniósł +9273 BTC w skali tygodnia, co wskazuje na masowe przenoszenie monet na giełdy w celu sprzedaży lub zabezpieczenia. Ten techniczny sygnał tłumaczy spadek ceny BTC o 2,45% mimo pozytywnych sygnałów makro.</div>
+      </div>
+      
+      <div class="thread">
+        <div class="label">• Regulacje: Bitcoin w 401(k) trafia do Białego Domu <span class="muted">(08.11.2026)</span></div>
+        <div>Projekt ustawy pozwalający na inwestowanie w bitcoina w ramach planów emerytalnych 401(k) wszedł na etap przeglądu przez administrację prezydenta. To potencjalny katalizator dla długoterminowego popytu instytucjonalnego.</div>
+      </div>
+      
+      <div class="thread">
+        <div class="label">• Odpływ kapitału z ETF-ów na bitcoina <span class="muted">(07.11.2026)</span></div>
+        <div>Zgodnie z podsumowaniem tygodniowym, odnotowano wyraźne wyjścia z funduszy ETF na bitcoina. W połączeniu z napływem na giełdy potwierdza to rotację kapitału lub realizację zysków przez duże podmioty.</div>
+      </div>
+      
+      <div class="thread">
+        <div class="label">• Aave przejmuje zespół Avon (rozbudowa DeFi) <span class="muted">(06.11.2026)</span></div>
+        <div>Aave Labs nabyło technologię Avon, aby wzmocnić ofertę pożyczek o stałej stopie procentowej on-chain. To ważny krok w dojrzałości DeFi i integracji mechanizmów z rynku tradycyjnego.</div>
+      </div>
+      
+      <div class="thread">
+        <div class="label">• Strzelanina w Krakowie i żałoba narodowa <span class="muted">(07-08.11.2026)</span></div>
+        <div>Choć to wydarzenie makrospołeczne, a nie krypto, dominowało w polskich mediach i mogło wpływać na sentyment lokalnych inwestorów oraz ogólną atmosferę rynkową w regionie.</div>
+      </div>
+      
+      <div class="thread">
+        <div class="label">• Launch aplikacji Leap (Solana Labs) <span class="muted">(05.11.2026)</span></div>
+        <div>Uruchomienie bety aplikacji do handlu tokenizowanymi akcjami i krypto na Solanie. Sygnalizuje dalszą konwergencję rynków TradFi i DeFi oraz rosnącą adopcję Solany w segmencie instytucjonalnym.</div>
+      </div>
+      
+    </div>
+    
+
+    
+
+    
+
+    
+    <div class="outlook">
+      <h3>Obraz rynku</h3>
+      <p>Rynek kryptowalut w tym okresie charakteryzował się rosnącym strachem, co potwierdza indeks Fear &amp; Greed na poziomie 28 (Fear). Dominacja Bitcoina utrzymywała się na wysokim poziomie 59,3%, co wskazuje na rotację kapitału z altcoinów do BTC w obliczu niepewności. Negatywne przepływy w ETF-ach (-39,4 mln USD w ostatnim odczycie) oraz napływ BTC na giełdy sygnalizowały presję sprzedażową ze strony inwestorów instytucjonalnych i detalicznych. Sytuację komplikowały makroekonomiczne napięcia, w tym spadek dolara po wyborach śródokresowych w USA, co paradoksalnie nie przełożyło się na wzrost cen krypto. Ogólny obraz to rynek w fazie obrony, z ograniczonym apetytem na ryzyko i silnym wpływem czynników zewnętrznych na nastroje.</p>
+    </div>
+    
+
+    
+    <div class="outlook">
+      <h3>Makro a Bitcoin</h3>
+      <p>Spadek dolara amerykańskiego po przejęciu Kongresu przez Demokratów w wyborach śródokresowych stworzył teoretycznie sprzyjające warunki dla aktywów ryzykownych, jednak rynek krypto zareagował na to słabo. Wysokie rentowności obligacji skarbowych USA (US10Y na poziomie 4,86%) pozostały kluczowym hamulcem wzrostu, utrzymując presję na wyceny. Polityka monetarna i niepewność co do dalszych decyzji Fed w kontekście danych gospodarczych dominowały w dyskusjach makro. Brak wyraźnego katalizatora wzrostowego w sferze regulacyjnej lub monetarnej sprawił, że BTC pozostał podatny na korekty mimo słabnącego dolara.</p>
+    </div>
+    
+
+    
+    <div class="outlook">
+      <h3>Wieloryby / przepływy giełdowe</h3>
+      <p>Analiza przepływów giełdowych wykazała wyraźny napływ BTC na giełdy, co jest typowym sygnałem przygotowania do sprzedaży. W skali 7 dni odnotowano napływ 9 273,7 BTC, a w ostatnich 24 godzinach dodatkowo 629,5 BTC, co potwierdza rosnącą presję sprzedażową ze strony dużych graczy. Taki wzorzec przepływów koreluje z obserwowanym spadkiem cen i utratą zysków z początku tygodnia. Wieloryby prawdopodobnie realizowały zyski po dotknięciu lokalnego szczytu 81 004 USD, wykorzystując moment słabszego popytu do pozbywania się pozycji.</p>
+    </div>
+    
+
+    
+    <div class="outlook">
+      <h3>Scenariusze zachowania BTC</h3>
+      <p class="muted">To scenariusze analityczne na podstawie newsów i wskaźników — nie rekomendacja inwestycyjna.</p>
+      
+      <p><b>Bazowy:</b> Konsolidacja w zakresie 74.9k-76.5k USD. Rynek balansuje na granicy strachu (Fear &amp; Greed 28) i presji sprzedażowej wynikającej z napływu BTC na giełdy (+9.2k BTC w 7 dni). Spadek dolara po wyborach w USA może częściowo amortyzować spadki, ale brak silnego popytu ETF (ostatni dzień -39 mln USD) sugeruje brak katalizatora do odbicia.</p>
+      
+      
+      <p><b>Optymistyczny:</b> Odbicie powyżej 78k USD, jeśli przepływ na giełdy zostanie zneutralizowany przez zakup przez instytucje (np. Strive, które kupiły 6.1k BTC) oraz jeśli regulacje 401(k) dla BTC przejdą pozytywny przegląd w Białym Domu, co przyciągnie kapitał detaliczny i instytucjonalny.</p>
+      
+      
+      <p><b>Pesymistyczny:</b> Przełamanie wsparcia 74.9k USD i testowanie poziomu 72k-73k USD. Wzrost napływu na giełdy (presja sprzedaży) w połączeniu z wysoką dominacją BTC (59.3%) i słabym sentymentem może doprowadzić do dalszej korekty, szczególnie jeśli rentowności obligacji US10Y utrzymają się na wysokim poziomie (4.85%).</p>
+      
+    </div>
+    
+
+    
+    <h3>Na radarze</h3>
+    <p><span class="pill">Napływ 9.27k BTC na giełdy w ciągu 7 dni – silny sygnał potencjalnej presji sprzedażowej.</span><span class="pill">Spadek dolara po przejęciu Kongresu przez Demokratów – może wspierać aktywa ryzykowne, w tym krypto.</span><span class="pill">Przejęcie zespołu Avon przez Aave – rozwój pożyczek o stałej stopie on-chain, co może zwiększyć popyt na BTC jako zabezpieczenie.</span><span class="pill">Regulacje 401(k) dla Bitcoinów w USA – kluczowy katalizator dla napływu kapitału detalicznego.</span><span class="pill">Zakup 6.18k BTC przez Strive – sygnał kontynuacji akumulacji przez firmy technologiczne.</span></p>
+    
+
+    
+    <h3>Skrót wniosków</h3>
+    <ul>
+      
+      <li><b>Tydzień przyniósł spadek BTC o 2.45% do 75.8k USD, co jest zgodne z ogólnym sentymentem strachu na rynku.</b></li>
+      
+      <li><b>Napływ BTC na giełdy (+9.2k w 7 dni) jest głównym czynnikiem ryzyka, ale zakup przez Strive (6.1k BTC) częściowo go neutralizuje.</b></li>
+      
+      <li><b>Spadek dolara po wyborach w USA może być pozytywnym katalizatorem dla BTC, jeśli rentowności obligacji spadną.</b></li>
+      
+      <li><b>Regulacje 401(k) dla Bitcoinów w USA są kluczowym wydarzeniem, które może zmienić dynamikę rynku w nadchodzących tygodniach.</b></li>
+      
+      <li><b>Rynek krypto pozostaje w fazie konsolidacji, z ograniczonymi sygnałami do wybicia w górę lub dals</b></li>
+      
+    </ul>
+    
+
+    
+    <h3>Ryzyka</h3>
+    <ul><li>Wysoki napływ BTC na giełdy może prowadzić do dalszych spadków, jeśli nie zostanie pochłonięty przez popyt.</li><li>Niska wartość Fear &amp; Greed Index (28) wskazuje na panikę, co może prowadzić do dalszych wyprzedaży.</li><li>Wysoka dominacja BTC (59.3%) sugeruje, że kapitał ucieka z altcoinów, co może ograniczyć wzrosty całego rynku.</li><li>Niestabilność polityczna w USA po wyborach może wpłynąć na politykę monetarną i rentowności obligacji.</li></ul>
+    
+
+    
+    <h2>Materiały źródłowe okresu</h2>
+    <p class="muted">Nagłówki z całego okna (archiwum + Google News), po polsku. To nie są streszczenia „z wczoraj”.</p>
+    <ul>
+      
+      <li>
+        <span class="article-title"><a href="https://www.money.pl/finanse/krakow-w-cieniu-tragedii-turystyka-to-miliardy-zlotych-7348698643524064a.html">Kraków w cieniu tragedii. Turystyka warta miliardy złotych</a></span>
+        <span class="src"> (Money.pl Krypto · 2026-11-08)</span>
+        
+        <br /><span class="muted">EN: Kraków w cieniu tragedii. Turystyka to miliardy złotych</span>
+        
+        <span class="article-sum">Strzelanina na krakowskim Rynku uderzyła w gospodarkę miasta, które w 2025 roku odnotowało przychody z turystyki na poziomie 15,4 mld zł. Z tej kwoty aż 9,5 mld zł pozostało bezpośrednio w lokalnym obiegu gospodarczym, co podkreśla wrażliwość regionu na takie incydenty.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://www.newsbtc.com/news/solana/solana-labs-backed-leap-launches-beta-app-for-tokenized-stocks-and-crypto/">Leap wspierane przez Solana Labs uruchamia betę aplikacji dla tokenizowanych akcji i krypto</a></span>
+        <span class="src"> (NewsBTC · 2026-11-08)</span>
+        
+        <br /><span class="muted">EN: Solana Labs-Backed Leap Launches Beta App for Tokenized Stocks and Crypto</span>
+        
+        <span class="article-sum">Leap, mobilna aplikacja handlowa wspierana przez Solana Labs, rozpoczęła wczesny dostęp beta na iOS 5 listopada. Platforma umożliwia handel tokenizowanymi akcjami, ETF-ami, metalami, walutami oraz kryptowalutami, integrując tradycyjne klasy aktywów z technologią on-chain.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://www.money.pl/gospodarka/prezydent-podjal-decyzje-zaloba-narodowa-w-calej-polsce-7348689180039648a.html">Prezydent ogłasza żałobę narodową w całej Polsce</a></span>
+        <span class="src"> (Money.pl Krypto · 2026-11-08)</span>
+        
+        <br /><span class="muted">EN: Prezydent podjął decyzję. Żałoba narodowa w całej Polsce</span>
+        
+        <span class="article-sum">Prezydent Karol Nawrocki ogłosił dwudniową żałobę narodową po tragicznej strzelaninie w Krakowie, w której zginęło sześć osób, a 16 zostało rannych. W ramach uczczenia pamięci ofiar flagi w całym kraju zostały opuszczone do połowy masztu.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://www.newsbtc.com/news/defi/aave-buys-avon-team-to-bring-more-fixed-rate-lending-onchain/">Aave przejmuje zespół Avon, aby rozwinąć pożyczki o stałej stopie on-chain</a></span>
+        <span class="src"> (NewsBTC · 2026-11-08)</span>
+        
+        <br /><span class="muted">EN: Aave Buys Avon Team to Bring More Fixed-Rate Lending Onchain</span>
+        
+        <span class="article-sum">Aave Labs ogłosiło przejęcie zespołu i technologii Avon, w tym systemów pożyczek o stałej i zmiennej stopie oraz księgi zleceń on-chain. Ta transakcja ma wzmocnić kompetencje Aave w zakresie pożyczek o stałej stopie, choć nie oznacza to jeszcze natychmiastowej zmiany w ofercie dla użytkowników.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://www.bankier.pl/wiadomosc/Gwardia-prezydencka-za-325-tys-zl-dziennie-Podliczylismy-kaprys-Nawrockiego-9224240.html?utm_source=RSS&amp;utm_medium=RSS&amp;utm_campaign=Wiadomosci">Gwardia prezydencka za setki milionów. Koszt pomysłu Nawrockiego</a></span>
+        <span class="src"> (Bankier · 2026-11-08)</span>
+        
+        <br /><span class="muted">EN: Gwardia prezydencka za setki milionów. Podliczyliśmy kaprys Nawrockiego</span>
+        
+        <span class="article-sum">Prezydent Karol Nawrocki zaproponował utworzenie odrębnej jednostki ochrony, podlegającej wyłącznie jemu, zamiast korzystać z Służby Ochrony Państwa. Eksperci szacują, że koszt takiego przedsięwzięcia może sięgać setek milionów złotych, co budzi kontrowersje w rządzie.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://www.bankier.pl/wiadomosc/Ceny-mieszkan-we-Wroclawiu-wystrzelily-Jeden-segment-rosnie-w-sile-9223507.html?utm_source=RSS&amp;utm_medium=RSS&amp;utm_campaign=Wiadomosci">Ceny mieszkań we Wrocławiu gwałtownie rosną. Jeden segment zyskuje na wartości</a></span>
+        <span class="src"> (Bankier · 2026-11-08)</span>
+        
+        <br /><span class="muted">EN: Ceny mieszkań we Wrocławiu wystrzeliły. Jeden segment rośnie w siłę</span>
+        
+        <span class="article-sum">Średnia cena metra kwadratowego mieszkań deweloperskich we Wrocławiu wzrosła w październiku do 16,3 tys. zł, co oznacza wzrost o 7 proc. rok do roku. Po okresie stabilizacji rynek ponownie przyspieszył, z wyraźnym wzrostem cen w określonym segmencie rynku.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://www.money.pl/biznes/lista-wstydu-rafala-brzoski-jest-za-krotka-setki-duzych-firm-nie-placa-podatkow-analiza-7348507767966176a.html">Lista wstydu Rafała Brzoski jest za krótka. Setki dużych firm nie płacą podatków [ANALIZA]</a></span>
+        <span class="src"> (Money.pl · 2026-11-08)</span>
+        
+        <span class="article-sum">Co dziesiąte duże przedsiębiorstwo w Polsce w 2025 r. nie zapłaciło podatku CIT mimo tego, że było dochodowe. Wśród firm rodzimych było to częstsze niż wśród zagranicznych, wbrew popularnej tezie, że te drugie powszechnie uchylają się od płacenia nad Wisłą podatków. Planowana przez rząd podwyżka stawki CIT nie uderzy więc bardziej w polski kapitał.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://pl.beincrypto.com/elon-musk-satoshi-nakamoto-analiza-stylometrii/">Kim jest Satoshi Nakamoto? Nowe badanie Grok AI testuje różne teorie</a></span>
+        <span class="src"> (BeInCrypto PL · 2026-11-08)</span>
+        
+        <span class="article-sum">Nowa otwarta analiza na GitHub sprawdziła popularną teorię, że Elon Musk jest Satoshi Nakamoto. Badanie przeanalizowało trzy cechy pisma, na które często powołują się zwolennicy tej teorii. Jednak wyniki sugerują, że styl pisania Muska ma niewiele wspólnego z anonimowym twórcą Bitcoina. Co wykazał test stylometrii Satoshiego Stylometria to statystyczne badanie stylu pisania w celu identyfikacji lu</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://u.today/ripple-loses-dominance-in-stablecoin-market-cap-growth">Ripple Loses Dominance in Stablecoin Market Cap Growth</a></span>
+        <span class="src"> (U.Today · 2026-11-08)</span>
+        
+        <span class="article-sum">Ripple steps down from the top one position in stablecoin market growth as Ethena takes over with $337.4 million in just 24 hours.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://pl.beincrypto.com/dlaczego-spada-dolar-amerykanski-dxy/">Dlaczego dolar amerykański spada? Wybory śródokresowe, rentowności i kluczowy test gospodarczy</a></span>
+        <span class="src"> (BeInCrypto PL · 2026-11-08)</span>
+        
+        <span class="article-sum">Dolar amerykański stracił najwięcej po wyborach od tygodni po tym, jak Demokraci przejęli Kongres w wyborach środka kadencji w USA. Spadające rentowności obligacji skarbowych i niepewność co do polityki gospodarczej Waszyngtonu zniechęciły inwestorów do waluty. Indeks dolara amerykańskiego (DXY) , który mierzy siłę dolara wobec sześciu głównych walut, osiągnął 101,10 w dniu 4 listopada, najniżej o</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://u.today/shiba-inu-futures-flow-plunges-67x-in-days-what-does-this-mean-for-shib-price">Shiba Inu Futures Flow Plunges 67x in Days: What Does This Mean for SHIB Price?</a></span>
+        <span class="src"> (U.Today · 2026-11-08)</span>
+        
+        <span class="article-sum">SHIB Derivatives Market Sends Surprising Signal with implications for Shiba Inu price now being watched.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://bithub.pl/inwestycje/nowe-technologie/szef-nvidia-mial-romans-z-chinskim-szpiegiem-szokujace-ustalenia-amerykanskiego-wywiadu/">Szef Nvidia miał romans z chińskim szpiegiem? Szokujące ustalenia amerykańskiego wywiadu</a></span>
+        <span class="src"> (BitHub · 2026-11-07)</span>
+        
+        <span class="article-sum">Kobieta, z którą szef Nvidia się spotykał była zwerbowana przez chińskie służby wywiadowcze? Amerykański wywiad dotarł do ciekawych informacji dotyczących Jensena Huanga. Według ustaleń amerykańskiego wywiadu, do których dotarł serwis Financial Times, Jensen Huang mógł być celem chińskiej operacji szpiegowskiej. Trop ma prowadzić do jednej z kobiet, z którymi szef Nvidia miał być w romantycznej […</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://bithub.pl/metale-szlachetne/starcia-wzdluz-granicy-egiptu-z-sudanem-przyczyna-czarnorynkowe-zloto/">Starcia wzdłuż granicy Egiptu z Sudanem. Przyczyną czarnorynkowe złoto</a></span>
+        <span class="src"> (BitHub · 2026-11-07)</span>
+        
+        <span class="article-sum">W starciach na granicy Egiptu z Sudanem zginęli wojskowi dygnitarze – co sugeruje, że tamtejszy konflikt o złoto zaostrza się coraz bardziej. Artykuł Starcia wzdłuż granicy Egiptu z Sudanem. Przyczyną czarnorynkowe złoto pochodzi z serwisu BitHub.pl .</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://cryptoslate.com/thailand-is-cutting-off-bitget-users-have-until-december-5-to-prepare/">Thailand is cutting off Bitget. Users have until December 5 to prepare</a></span>
+        <span class="src"> (CryptoSlate · 2026-11-07)</span>
+        
+        <span class="article-sum">The regulator asks customers to consider action on holdings before the block, while Bitget promises guidance on service access. Read the full story on CryptoSlate Understand the crypto stories that matter and what to watch next. Get The Catalyst in your inbox</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://www.theblock.co/news/business/2026-11-07-binance-cfo-steps-down-nine-days-after-record-hack-co-ceo-says-transition-was-planned-six-months-ago-435992">Binance CFO steps down nine days after record hack; co-CEO says transition was planned six months ago</a></span>
+        <span class="src"> (The Block · 2026-11-07)</span>
+        
+        <span class="article-sum">Co-CEO Yi He said Ng is departing to pursue a new venture, under a transition plan put in place over the past six months.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://www.theblock.co/news/regulation/2026-11-07-ex-fbi-agent-pleads-guilty-to-stealing-2-47-million-in-crypto-from-wallets-tied-to-35-investigations-435988">Ex-FBI agent pleads guilty to stealing $2.47 million in crypto from wallets tied to 35 investigations</a></span>
+        <span class="src"> (The Block · 2026-11-07)</span>
+        
+        <span class="article-sum">Yaroch will pay at least $2.4 million in restitution and will forfeit any profits he would earn in the future from telling his story.</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://cryptoslate.com/us-sanctions-hit-41-companies-accused-of-keeping-prince-groups-scam-network-running/">US sanctions hit 41 companies accused of keeping Prince Group’s scam network running</a></span>
+        <span class="src"> (CryptoSlate · 2026-11-07)</span>
+        
+        <span class="article-sum">Treasury says the network concealed ownership and sustained Prince Group operations, while US rules require covered assets to be blocked. Read the full story on CryptoSlate Understand the crypto stories that matter and what to watch next. Get The Catalyst in your inbox</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://www.bankier.pl/wiadomosc/Szesc-ofiar-kilkunastu-rannych-i-dwa-dni-milczenia-Polska-wchodzi-w-okres-zaloby-9225556.html?utm_source=RSS&amp;utm_medium=RSS&amp;utm_campaign=Wiadomosci">Sześć ofiar, kilkunastu rannych i dwa dni milczenia. Polska wchodzi w okres żałoby</a></span>
+        <span class="src"> (Bankier · 2026-11-07)</span>
+        
+        <span class="article-sum">W związku z tragicznymi wydarzeniami w Krakowie prezydent Karol Nawrocki rozpoczął formalną procedurę ogłoszenia żałoby narodowej, która będzie obowiązywała 8 i 9 listopada - przekazał w sobotę wieczorem rzecznik prezydenta Rafał Leśkiewicz.</span>
+      </li>
+      
+    </ul>
+
+    
+    <h2>Cudze podsumowania okresu (źródła syntezy)</h2>
+    <p class="muted">Publiczne weekly/monthly wrap — AI ocenia ich tezy i łączy z własną analizą.</p>
+    <ul>
+      
+      <li>
+        <span class="article-title"><a href="https://news.google.com/rss/articles/CBMibkFVX3lxTFBaU0pEZnc1M3NTYUtKRXJWSlAwbzBkbmd5eno3N3NBTWRwR05EWmFSR0g4SGxPbXhVcXVyak5jNWxqNGpZT2hpQmozNkphYTE3clhzdVk2ZnBjLXN4NklTa05YQmxXVmo1cWhvUWpB?oc=5">Crypto Monthly Recap October 2026: Hacks, Prices, Outlook - CryptoTicker.io</a></span>
+        <span class="src"> (CryptoTicker.io)</span>
+        <span class="article-sum">Crypto Monthly Recap October 2026: Hacks, Prices, Outlook CryptoTicker.io</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://news.google.com/rss/articles/CBMif0FVX3lxTE5iaGJ1OVg1WnhyVGl6aU81dXYzSG50SUVMckpIaE1MbTRjODE0Tmx3cjh6RkhiQUg5MWlIMUVVQ3p1SjZuNnRzcTFmbGhQMU8tZDdRSjRZX0daZXZRLV9XdzZlMGh1YmpydThNck5EeDJiRUUybVhvbzdqM0ZpNU0?oc=5">Binance recovery, US crypto bill talks, Bitcoin ETF exits | Weekly recap - Crypto News</a></span>
+        <span class="src"> (Crypto News)</span>
+        <span class="article-sum">Binance recovery, US crypto bill talks, Bitcoin ETF exits | Weekly recap Crypto News</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://news.google.com/rss/articles/CBMiwAFBVV95cUxONXFuYzg4YlZvY2ozeTczN0ltaFJ3WDdNTkR2MkpIVzBZSGFiQ2RhSGJidTZ3SWpUMWZuOW5Lc0xVRlR0ZW8xMGpZOUZIa093TlUtUDNiQU5tMWdvb3dLVW54bmF5THpyOGNpWWh0bTYwekxmNmh0cFNrYzBoeVpmX1pmU1N2RGZRbTFiU21DR1Y4V254RGdxTUtOR3E0VVdIVWo4VUZtQ3N6cHVoUDBfV19SUGtFWU5jSDUzb0pHcmU?oc=5">Weekly Recap: Strive buys 6,182 Bitcoin and raises $630 million - TradingView</a></span>
+        <span class="src"> (TradingView)</span>
+        <span class="article-sum">Weekly Recap: Strive buys 6,182 Bitcoin and raises $630 million TradingView</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://news.google.com/rss/articles/CBMingFBVV95cUxQLWJDTjBBalYwVHVpc0VxV1BwRE1xeUt1RWlLQ1VJdnJQRXNnb3p6MnFNbjRBV0s0TnlldW4wSVIycFRQeVNISWJ3VV9wMWdjX1ZndE1Tc24tNzc0anNYWjl0SVBsRDhSa0dVTWlyVVYxX0w5b2JhTFB0Tm9Vb2FwYVZubTU1SVJlcy0zMEpXOEM4ZlhiSU1QazdVQVlldw?oc=5">Weekly market commentary - BlackRock</a></span>
+        <span class="src"> (BlackRock)</span>
+        <span class="article-sum">Weekly market commentary BlackRock</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://news.google.com/rss/articles/CBMiigJBVV95cUxPck5SUUpaXy1rRVdqVWh5dTVnakREOWpWU2hVaTBGV1I4WU1Nd3ctUUprNEplUl93MzVzZ1lHaFJTOXkyTG5WWmJWZFJxS01NVW1DRFh1eXlLTDVoa1NkUGprTjhkeXA3ejViblo2SFZmQ1E5X1pQSHU5ZmU2Ni1qRnBoUFhmRkVDYTJqcTVTZFdxWm14SWFpRnYtMk9pOFJJbWwzOHB0eHhCUElIUUJuTmNoUFZfUkZ2LVZTUmZpSVV0T21RbnZpcFlNdVJWaXN0QnpYc0RDQjFCZnNOUGhWZG9uZkNJQnVtWngwSjFlWk55WTM1QlZ0bnhYMWNfSG5nVmdSWDJ0SnIydw?oc=5">ENFORCEMENT ACTIONS—California recovers over $4.8 million for scam victims of major crypto ATM company CoinFlip - VitalLaw.com</a></span>
+        <span class="src"> (VitalLaw.com)</span>
+        <span class="article-sum">ENFORCEMENT ACTIONS—California recovers over $4.8 million for scam victims of major crypto ATM company CoinFlip VitalLaw.com</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://news.google.com/rss/articles/CBMiggFBVV95cUxPb1F0YnY1Ykp5Mjc2U3Juc2ZqMTVwTTRjc2JOb3RfMG9sNlF6aHRXa0drYURmekhDb1pEVUNCRE5WRUd0SVdTVER3ZzZCckEzQUVzUThMSGVHMk0tZEJFLW5CbWhqOU03WWtldFlwcUtLN3NQcFU5YldIa0lRVWRKYmR3?oc=5">⚡ Weekly Recap: Critical CVEs, Linux DDoS Botnet, Device-Code Phishing, Android Spyware and More - The Hacker News</a></span>
+        <span class="src"> (The Hacker News)</span>
+        <span class="article-sum">⚡ Weekly Recap: Critical CVEs, Linux DDoS Botnet, Device-Code Phishing, Android Spyware and More The Hacker News</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://news.google.com/rss/articles/CBMiywFBVV95cUxNRngwbllWODZqWWRkM2hqTXY0Ynp2ejlSRnp4aGdsQnhpaDV0SGhqNjRfaGR5WEJuTW1SWTBLMHh0VzA5c3VacVNILU55VUdnWTNkQng4aE81T1h4bDYwTWZHSUkzb2UydFZ0SFpLMEdHQTdydnZzZnQxa3dac1JaWU5fYnZMOFgwSnZKLWczWmV6N0U0STFyeXdfZjg3X3B5TjFXOTJ3T2cxdTZ5T0F4M3FPYjdaZDR1emZDbFJ5LWhtbkxmamFkMExNSQ?oc=5">Weekly Recap: Bitcoin holdings grow 26% and $30B digital credit capacity - TradingView</a></span>
+        <span class="src"> (TradingView)</span>
+        <span class="article-sum">Weekly Recap: Bitcoin holdings grow 26% and $30B digital credit capacity TradingView</span>
+      </li>
+      
+      <li>
+        <span class="article-title"><a href="https://news.google.com/rss/articles/CBMihgFBVV95cUxQSzFlbEJUbEZSNDFRbVMzb2hGaEMtUXFDRDFfbUllbjBqYUpWS2JSS2dwcWFfUUdhZEhMNzZZZGhheVNiVzNFdGhoc0UwcXAtRU5vSzVCdEpndTFLOGU3OHhRUl9jeUVJTERUTVpWWXYxT2xlbURLWDhoUUxfX0RLcFRxVjd5UQ?oc=5">Crypto News This Week: Recap, Prices and Key Dates - CryptoTicker.io</a></span>
+        <span class="src"> (CryptoTicker.io)</span>
+        <span class="article-sum">Crypto News This Week: Recap, Prices and Key Dates CryptoTicker.io</span>
+      </li>
+      
+    </ul>
+    
+
+    
+    <h2>Tematy dyskusji w okresie</h2>
+    <p><span class="pill">Wpływ wyborów śródokresowych w USA i spadku dolara na perspektywy rynku krypto</span><span class="pill">Negatywne przepływy w ETF-ach Bitcoin i ich implikacje dla krótkoterminowego trendu</span><span class="pill">Napływ BTC na giełdy jako sygnał presji sprzedażowej ze strony wiel</span></p>
+    
+    
+
+    <h2>Źródła</h2>
+    <ul class="src">
+      <li>CoinGecko (BTC/ETH + top 10 / OHLC okresu), NBP, alternative.me, mempool.space, Yahoo (^TNX)</li>
+      <li>XOOMAR ETF flows (+ fallback Farside), CryptoDataAPI exchange netflow</li>
+      <li>RSS z config.yaml, BitcoinTalk, TradingView, Google News (wydarzenia + cudze wrapy okresu)</li>
+    </ul>
+  </div>
+
+  <script>
+    function bootTv(containerId, symbol) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      if (typeof TradingView === 'undefined') {
+        el.innerHTML = '<p class="muted" style="padding:12px">Widget TradingView niedostępny w tej przeglądarce — użyj przycisku poniżej.</p>';
+        return;
+      }
+      new TradingView.widget({
+        container_id: containerId,
+        symbol: symbol,
+        interval: 'D',
+        timezone: 'Europe/Warsaw',
+        theme: 'light',
+        style: '1',
+        locale: 'pl',
+        toolbar_bg: '#f6f4ef',
+        enable_publishing: false,
+        allow_symbol_change: true,
+        hide_side_toolbar: false,
+        studies: ['MASimple@tv-basicstudies', 'RSI@tv-basicstudies'],
+        width: '100%',
+        height: 520
+      });
+    }
+    (function loadTv() {
+      const s = document.createElement('script');
+      s.src = 'https://s3.tradingview.com/tv.js';
+      s.onload = function () {
+        bootTv('tv-widget', 'BITSTAMP:BTCUSD');
+        bootTv('tv-widget-eth', 'BITSTAMP:ETHUSD');
+      };
+      s.onerror = function () {
+        bootTv('tv-widget', 'BITSTAMP:BTCUSD');
+        bootTv('tv-widget-eth', 'BITSTAMP:ETHUSD');
+      };
+      document.body.appendChild(s);
+    })();
+  </script>
+</body>
+</html>
