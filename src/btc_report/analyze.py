@@ -628,7 +628,10 @@ def analyze_period(brief: dict[str, Any]) -> dict[str, Any]:
     }
     translated = _chat_json(
         "Jesteś polskim redaktorem krypto. TYLKO JSON, całość po polsku. "
-        "Dla każdego elementu zwróć title_pl i summary_pl (2-3 pełne zdania). "
+        "Dla headlines: title_pl + summary_pl (2-3 pełne zdania o wydarzeniu). "
+        "Dla wraps (cudze weekly/monthly): title_pl + summary_pl = krótki 2-3 zdaniowy SKRÓT tego, "
+        "co dany twórca/portal PODKREŚLAŁ w swoim podsumowaniu (ich tezy, akcenty, ostrzeżenia) — "
+        "nie ogólny opis rynku od Ciebie. "
         "Schema: {\"headlines\":[{\"title\":\"oryginał\",\"title_pl\":\"...\",\"summary_pl\":\"...\"}],"
         "\"wraps\":[{\"title\":\"oryginał\",\"title_pl\":\"...\",\"summary_pl\":\"...\"}]}",
         "Przetłumacz / streść materiały z całego okresu (nie tylko z ostatniego dnia):\n"
@@ -794,7 +797,9 @@ def analyze_period(brief: dict[str, Any]) -> dict[str, Any]:
         item = dict(a)
         tr = by_w.get(a.get("title") or "") or {}
         item["title_pl"] = tr.get("title_pl") or item.get("title")
-        item["summary_pl"] = tr.get("summary_pl") or item.get("summary") or item.get("excerpt")
+        # preferuj AI-skrót „co podkreślali”; fallback: excerpt z wrapa
+        raw_sum = tr.get("summary_pl") or item.get("summary") or item.get("excerpt") or ""
+        item["summary_pl"] = _finish_sentence(raw_sum)
         period_wraps.append(item)
     out["period_wraps"] = period_wraps
     out["price_path"] = price
