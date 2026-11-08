@@ -579,13 +579,13 @@
 
     {% if analysis.period_wraps %}
     <h2>Cudze podsumowania okresu (źródła syntezy)</h2>
-    <p class="muted">Publiczne weekly/monthly wrap — AI ocenia ich tezy i łączy z własną analizą.</p>
+    <p class="muted">Publiczne weekly/monthly wrap — krótki skrót tego, co podkreślali twórcy/portale.</p>
     <ul>
       {% for a in analysis.period_wraps %}
       <li>
         <span class="article-title">{% if a.link %}<a href="{{ a.link }}">{{ a.title_pl or a.title }}</a>{% else %}{{ a.title_pl or a.title }}{% endif %}</span>
-        <span class="src"> ({{ a.source or '—' }})</span>
-        {% if a.summary_pl %}<span class="article-sum">{{ a.summary_pl }}</span>{% endif %}
+        <span class="src"> ({{ a.source or '—' }}{% if a.published_at %} · {{ a.published_at[:10] }}{% endif %})</span>
+        {% if a.summary_pl %}<span class="article-sum"><b>Co podkreślali:</b> {{ a.summary_pl }}</span>{% endif %}
       </li>
       {% endfor %}
     </ul>
@@ -597,12 +597,12 @@
     {% endif %}
     {% else %}
     <h2>Newsy krypto (PL)</h2>
-    <p class="muted">RSS branżowe — BTC, ETH i szerszy rynek krypto (nie tylko Bitcoin).</p>
+    <p class="muted">Świeże RSS / Google News — tylko tematy krypto, max. kilka dni wstecz.</p>
     <ul>
       {% for a in crypto_pl %}
       <li>
         <span class="article-title"><a href="{{ a.link }}">{{ a.title_pl or a.title }}</a></span>
-        <span class="src"> ({{ a.source }})</span>
+        <span class="src"> ({{ a.source }}{% if a.published_at %} · {{ a.published_at[:10] }}{% endif %})</span>
         <span class="article-sum">{{ a.summary_pl or a.summary or 'Brak streszczenia.' }}</span>
       </li>
       {% else %}
@@ -615,7 +615,7 @@
       {% for a in crypto_en %}
       <li>
         <span class="article-title"><a href="{{ a.link }}">{{ a.title_en or a.title }}</a></span>
-        <span class="src"> ({{ a.source }})</span>
+        <span class="src"> ({{ a.source }}{% if a.published_at %} · {{ a.published_at[:10] }}{% endif %})</span>
         {% if a.title_pl %}<br /><span><b>PL:</b> {{ a.title_pl }}</span>{% endif %}
         <span class="article-sum">{{ a.summary_pl or 'Brak polskiego streszczenia.' }}</span>
       </li>
@@ -629,7 +629,7 @@
       {% for a in macro %}
       <li>
         <span class="article-title"><a href="{{ a.link }}">{{ a.title_pl or a.title }}</a></span>
-        <span class="src"> ({{ a.source }})</span>
+        <span class="src"> ({{ a.source }}{% if a.published_at %} · {{ a.published_at[:10] }}{% endif %})</span>
         <span class="article-sum">{{ a.summary_pl or a.summary or 'Brak streszczenia.' }}</span>
       </li>
       {% else %}
@@ -687,7 +687,7 @@
     <ul class="src">
       <li>CoinGecko (BTC/ETH + top 10 / OHLC okresu), NBP, alternative.me, mempool.space, Yahoo (^TNX)</li>
       <li>XOOMAR ETF flows (+ fallback Farside), CryptoDataAPI exchange netflow</li>
-      <li>RSS z config.yaml, BitcoinTalk{% if not is_period_report %}, Telegram (t.me/s/){% endif %}, TradingView{% if is_period_report %}, Google News (wydarzenia + cudze wrapy okresu){% endif %}</li>
+      <li>RSS krypto (PL/EN, filtr świeżości + tematu){% if not is_period_report %}, Google News PL, Telegram (t.me/s/){% endif %}, BitcoinTalk, TradingView{% if is_period_report %}, Google News (wydarzenia + cudze wrapy okresu){% endif %}</li>
     </ul>
   </div>
 
