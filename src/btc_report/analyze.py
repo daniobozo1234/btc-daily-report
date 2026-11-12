@@ -227,6 +227,8 @@ def build_brief(
                 "title": t.get("title"),
                 "link": t.get("link"),
                 "excerpt": (t.get("excerpt") or "")[:280],
+                "last_post_at": t.get("last_post_at"),
+                "published_at": t.get("published_at"),
             }
             for t in forum[:5]
         ],
@@ -392,10 +394,19 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
         if not forum.get("summaries"):
             forum = _forum_fallback_pl(brief.get("forum") or [])
 
+        # dołóż daty aktywności z briefu (AI ich zwykle nie zwraca)
+        forum_by_link = {
+            (x.get("link") or ""): x for x in (brief.get("forum") or []) if x.get("link")
+        }
         for s in forum.get("summaries") or []:
             if not s.get("title_pl"):
                 s["title_pl"] = s.get("title")
             s["summary_pl"] = _finish_sentence(s.get("summary_pl") or "")
+            src = forum_by_link.get(s.get("link") or "") or {}
+            if not s.get("last_post_at"):
+                s["last_post_at"] = src.get("last_post_at")
+            if not s.get("published_at"):
+                s["published_at"] = src.get("published_at")
 
         telegram = (telegram_ai.get("telegram") or {}) if isinstance(telegram_ai, dict) else {}
         if not telegram.get("summaries"):
@@ -970,6 +981,8 @@ def _forum_fallback_pl(threads: list[dict]) -> dict[str, Any]:
                 "title": t.get("title"),
                 "title_pl": t.get("title"),
                 "summary_pl": _finish_sentence(t.get("excerpt") or "Brak fragmentu posta."),
+                "last_post_at": t.get("last_post_at"),
+                "published_at": t.get("published_at"),
             }
             for t in threads
         ],
