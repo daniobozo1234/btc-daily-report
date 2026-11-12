@@ -652,6 +652,7 @@
       {% for t in forum_block.summaries or [] %}
       <li>
         <span class="article-title"><a href="{{ t.link }}">{{ t.title_pl or t.title }}</a></span>
+        <span class="src"> ({% if t.last_post_at %}ostatni post: {{ t.last_post_at[:10] }}{% elif t.published_at %}{{ t.published_at[:10] }}{% else %}brak daty{% endif %}{% if t.published_at and t.last_post_at and t.published_at[:10] != t.last_post_at[:10] %} · start: {{ t.published_at[:10] }}{% endif %})</span>
         {% if t.title and t.title_pl and t.title != t.title_pl %}
         <br /><span class="muted">EN: {{ t.title }}</span>
         {% endif %}
