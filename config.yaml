@@ -10,6 +10,7 @@ limits:
   macro_articles: 6
   forum_threads: 8
   telegram_posts: 14
+  x_posts: 12
   per_feed: 6
   # odrzucaj artykuły starsze niż N dni (i bez daty) — koniec „newsy z 2024”
   max_article_age_days: 4
@@ -107,6 +108,39 @@ telegram:
       name: Wu Blockchain
     - handle: CoinBureau
       name: Coin Bureau
+
+# X (Twitter) — bez oficjalnego API: publiczne RSS FxTwitter (fxtwitter.com).
+# Konto X NIE daje darmowego API; oficjalne API jest płatne. FxTwitter bywa kruche (404).
+x_twitter:
+  enabled: true
+  max_age_hours: 72
+  per_account: 2
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  accounts:
+    - handle: saylor
+      name: Michael Saylor
+    - handle: DocumentingBTC
+      name: Documenting Bitcoin
+    - handle: APompliano
+      name: Anthony Pompliano
+    - handle: CryptoHayes
+      name: Arthur Hayes
+    - handle: adam3us
+      name: Adam Back
+    - handle: lopp
+      name: Jameson Lopp
+    - handle: LynAldenContact
+      name: Lyn Alden
+    - handle: Excellion
+      name: Samson Mow
+    - handle: whale_alert
+      name: Whale Alert
+    - handle: coinbase
+      name: Coinbase
+    - handle: Tier10k
+      name: Tier10k
+    - handle: VitalikButerin
+      name: Vitalik Buterin
 
 chart:
   daily_days: 30
