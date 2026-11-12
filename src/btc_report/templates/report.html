@@ -682,13 +682,33 @@
       <li class="muted">Brak świeżych postów z wybranych kanałów.</li>
       {% endfor %}
     </ul>
+
+    <h2>X (Twitter) — głosy branży</h2>
+    <p class="muted">Bez oficjalnego API X (płatne) — publiczne RSS FxTwitter; część kont bywa niedostępna.</p>
+    <p>{{ x_block.overall or 'Brak podsumowania X.' }}</p>
+    {% if x_block.hot_topics %}
+    <h3>Tematy na X</h3>
+    <p>{% for t in x_block.hot_topics %}<span class="pill">{{ t }}</span>{% endfor %}</p>
+    {% endif %}
+    <h3>Wybrane posty</h3>
+    <ul>
+      {% for t in x_block.summaries or [] %}
+      <li>
+        <span class="article-title"><a href="{{ t.link }}">{{ t.title_pl or t.author or 'Post' }}</a></span>
+        <span class="src"> ({% if t.author %}{{ t.author }}{% endif %}{% if t.published_at %}{% if t.author %} · {% endif %}{{ t.published_at[:10] }}{% endif %})</span>
+        <span class="article-sum">{{ t.summary_pl or '' }}</span>
+      </li>
+      {% else %}
+      <li class="muted">Brak świeżych postów z wybranych kont X.</li>
+      {% endfor %}
+    </ul>
     {% endif %}
 
     <h2>Źródła</h2>
     <ul class="src">
       <li>CoinGecko (BTC/ETH + top 10 / OHLC okresu), NBP, alternative.me, mempool.space, Yahoo (^TNX)</li>
       <li>XOOMAR ETF flows (+ fallback Farside), CryptoDataAPI exchange netflow</li>
-      <li>RSS krypto (PL/EN, filtr świeżości + tematu){% if not is_period_report %}, Google News PL, Telegram (t.me/s/){% endif %}, BitcoinTalk, TradingView{% if is_period_report %}, Google News (wydarzenia + cudze wrapy okresu){% endif %}</li>
+      <li>RSS krypto (PL/EN, filtr świeżości + tematu){% if not is_period_report %}, Google News PL, Telegram (t.me/s/), X via FxTwitter{% endif %}, BitcoinTalk, TradingView{% if is_period_report %}, Google News (wydarzenia + cudze wrapy okresu){% endif %}</li>
     </ul>
   </div>
 
