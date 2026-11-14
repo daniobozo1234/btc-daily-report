@@ -55,7 +55,11 @@ def send_email(
     report_date: datetime | None = None,
     report_url: str | None = None,
 ) -> dict[str, Any]:
-    """Wysyła krótki mail z linkiem do pełnego raportu (bez ciężkiego HTML w treści)."""
+    """Wysyła krótki mail z linkiem do pełnego raportu (bez ciężkiego HTML w treści).
+
+    Wysyłka per odbiorca: przy darmowym Resend (onboarding@resend.dev) batch z Gmailem
+    padał cały job — wtedy Interia też nie dostawała raportu, tylko mail o błędzie Actions.
+    """
     api_key = cfg.require_env("RESEND_API_KEY")
     to_emails = _parse_recipients(cfg.require_env("REPORT_TO_EMAIL"))
     if not to_emails:
@@ -72,14 +76,57 @@ def send_email(
     )
 
     resend.api_key = api_key
-    params: dict[str, Any] = {
-        "from": from_email,
-        "to": to_emails,
-        "subject": subject,
-        "html": cover,
-    }
     print(f"→ odbiorcy: {', '.join(to_emails)}")
-    return resend.Emails.send(params)
+    sent: list[dict[str, Any]] = []
+    failed: list[str] = []
+    for to in to_emails:
+        try:
+            result = resend.Emails.send(
+                {
+                    "from": from_email,
+                    "to": [to],
+                    "subject": subject,
+                    "html": cover,
+                }
+            )
+            rid = result.get("id") if isinstance(result, dict) else None
+            print(f"  ✓ Resend → {to}" + (f" (id={rid})" if rid else ""))
+            sent.append({"to": to, "result": result})
+        except Exception as exc:
+            msg = str(exc)
+            failed.append(f"{to}: {msg}")
+            if _is_resend_testing_recipient_block(msg):
+                print(
+                    f"  ! Resend odrzucił {to} (tryb testowy / brak zweryfikowanej domeny). "
+                    "Interia/zweryfikowany adres nadal może dostać maila. "
+                    "Żeby Gmail działał: resend.com/domains + FROM z własnej domeny."
+                )
+            else:
+                print(f"  ! Resend błąd dla {to}: {msg}")
+
+    if not sent:
+        raise RuntimeError(
+            "Nie udało się wysłać raportu do żadnego odbiorcy. "
+            + " | ".join(failed)
+        )
+    if failed:
+        print(f"  ! częściowa wysyłka — pominięto: {'; '.join(f.split(':', 1)[0] for f in failed)}")
+    # kompatybilność wsteczna: id pierwszego udanego
+    first = sent[0]["result"] if isinstance(sent[0]["result"], dict) else {}
+    return {
+        "id": first.get("id") if isinstance(first, dict) else None,
+        "sent": sent,
+        "failed": failed,
+    }
+
+
+def _is_resend_testing_recipient_block(msg: str) -> bool:
+    low = (msg or "").lower()
+    return (
+        "only send testing emails to your own email" in low
+        or "verify a domain" in low
+        or "you can only send testing emails" in low
+    )
 
 
 def _parse_recipients(raw: str) -> list[str]:
