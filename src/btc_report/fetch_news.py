@@ -57,27 +57,39 @@ def _clip(text: str, limit: int) -> str:
     return text[: limit - 1].rstrip() + "…"
 
 
+def _parse_dt_string(raw_s: str) -> datetime | None:
+    raw_s = (raw_s or "").strip()
+    if not raw_s:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw_s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        pass
+    try:
+        dt = parsedate_to_datetime(raw_s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
 def _parse_date(entry: Any) -> str | None:
+    """Data publikacji z RSS. Preferuj published; updated tylko gdy brak published.
+
+    Google News często ustawia świeże published = data indeksacji, nie artykułu —
+    takie linki odrzucamy osobno (_is_google_news_link).
+    """
     for key in ("published", "updated"):
         raw = getattr(entry, key, None) or (entry.get(key) if isinstance(entry, dict) else None)
         if not raw:
             continue
-        raw_s = str(raw).strip()
-        # ISO-8601 (częste w nowoczesnych feedach)
-        try:
-            dt = datetime.fromisoformat(raw_s.replace("Z", "+00:00"))
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            return dt.astimezone(timezone.utc).isoformat()
-        except Exception:
-            pass
-        try:
-            dt = parsedate_to_datetime(raw_s)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            return dt.astimezone(timezone.utc).isoformat()
-        except Exception:
-            continue
+        dt = _parse_dt_string(str(raw))
+        if dt:
+            return dt.isoformat()
     for key in ("published_parsed", "updated_parsed"):
         struct = getattr(entry, key, None)
         if not struct:
@@ -87,6 +99,54 @@ def _parse_date(entry: Any) -> str | None:
             return dt.isoformat()
         except Exception:
             continue
+    return None
+
+
+def _is_google_news_link(link: str) -> bool:
+    low = (link or "").lower()
+    return "news.google." in low or "news.google.com" in low
+
+
+_HTML_DATE_PATTERNS = (
+    re.compile(
+        r'"datePublished"\s*:\s*"([^"]+)"',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'property=["\']article:published_time["\']\s+content=["\']([^"\']+)',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'content=["\']([^"\']+)["\']\s+property=["\']article:published_time["\']',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'itemprop=["\']datePublished["\']\s+content=["\']([^"\']+)',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'content=["\']([^"\']+)["\']\s+itemprop=["\']datePublished["\']',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'<meta[^>]+name=["\']pubdate["\'][^>]+content=["\']([^"\']+)',
+        re.IGNORECASE,
+    ),
+)
+
+
+def extract_html_published_at(html: str) -> str | None:
+    """Wyciągnij datę publikacji z HTML (JSON-LD / OpenGraph)."""
+    if not html:
+        return None
+    head = html[:120_000]
+    for pat in _HTML_DATE_PATTERNS:
+        m = pat.search(head)
+        if not m:
+            continue
+        dt = _parse_dt_string(m.group(1))
+        if dt:
+            return dt.isoformat()
     return None
 
 
@@ -156,6 +216,10 @@ def fetch_feed(
                 pass
         summary = _clip(raw_summary, 500)
         if not link:
+            continue
+        # Google News: data w RSS ≠ data artykułu (np. sierpień wraca jako „dziś”)
+        if _is_google_news_link(link):
+            skipped_old += 1
             continue
         published_at = _parse_date(entry)
         if not _is_fresh(published_at, max_age_days):
