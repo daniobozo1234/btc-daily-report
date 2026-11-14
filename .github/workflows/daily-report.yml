@@ -24,6 +24,10 @@ jobs:
         run: mkdir -p data/charts output
       - name: Run auto report + send
         env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           REPORT_TO_EMAIL: ${{ secrets.REPORT_TO_EMAIL }}
           REPORT_FROM_EMAIL: ${{ secrets.REPORT_FROM_EMAIL }}
