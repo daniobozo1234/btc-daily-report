@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import random
+import smtplib
+import ssl
 from datetime import datetime
+from email.message import EmailMessage
+from email.utils import formataddr, parseaddr
 from pathlib import Path
 from typing import Any
 
@@ -55,19 +59,14 @@ def send_email(
     report_date: datetime | None = None,
     report_url: str | None = None,
 ) -> dict[str, Any]:
-    """Wysyła krótki mail z linkiem do pełnego raportu (bez ciężkiego HTML w treści).
+    """Wysyła krótki mail z linkiem do pełnego raportu.
 
-    Wysyłka per odbiorca: przy darmowym Resend (onboarding@resend.dev) batch z Gmailem
-    padał cały job — wtedy Interia też nie dostawała raportu, tylko mail o błędzie Actions.
+    Preferuje SMTP (np. Interia) — działa na dowolnych odbiorców (Interia + Gmail).
+    Bez SMTP: Resend (darmowy tier tylko na e-mail konta Resend).
     """
-    api_key = cfg.require_env("RESEND_API_KEY")
     to_emails = _parse_recipients(cfg.require_env("REPORT_TO_EMAIL"))
     if not to_emails:
         raise RuntimeError("REPORT_TO_EMAIL jest puste — podaj co najmniej jeden adres.")
-    from_email = (
-        cfg.env("REPORT_FROM_EMAIL", "BTC Report <onboarding@resend.dev>")
-        or "BTC Report <onboarding@resend.dev>"
-    )
 
     cover = build_cover_html(
         report_types=report_types or ["daily"],
@@ -75,8 +74,83 @@ def send_email(
         report_url=report_url,
     )
 
-    resend.api_key = api_key
     print(f"→ odbiorcy: {', '.join(to_emails)}")
+    if _smtp_configured():
+        return _send_via_smtp(to_emails=to_emails, subject=subject, html=cover)
+    return _send_via_resend(to_emails=to_emails, subject=subject, html=cover)
+
+
+def _smtp_configured() -> bool:
+    user = (cfg.env("SMTP_USER") or "").strip()
+    password = (cfg.env("SMTP_PASSWORD") or "").strip()
+    return bool(user and password)
+
+
+def _send_via_smtp(*, to_emails: list[str], subject: str, html: str) -> dict[str, Any]:
+    host = (cfg.env("SMTP_HOST") or "poczta.interia.pl").strip()
+    port = int((cfg.env("SMTP_PORT") or "465").strip() or "465")
+    user = (cfg.env("SMTP_USER") or "").strip()
+    password = (cfg.env("SMTP_PASSWORD") or "").strip()
+    from_raw = (
+        cfg.env("REPORT_FROM_EMAIL")
+        or f"BTC Report <{user}>"
+    ).strip()
+    from_name, from_addr = parseaddr(from_raw)
+    if not from_addr:
+        from_addr = user
+        from_name = "BTC Report"
+    from_header = formataddr((from_name or "BTC Report", from_addr))
+
+    print(f"→ wysyłka SMTP {host}:{port} jako {from_addr}")
+    context = ssl.create_default_context()
+    sent: list[dict[str, Any]] = []
+    failed: list[str] = []
+
+    # Jedno połączenie, osobny mail per odbiorca (czytelniej w skrzynkach)
+    try:
+        if port == 465:
+            server: smtplib.SMTP = smtplib.SMTP_SSL(host, port, context=context, timeout=45)
+        else:
+            server = smtplib.SMTP(host, port, timeout=45)
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+        with server:
+            server.login(user, password)
+            for to in to_emails:
+                try:
+                    msg = EmailMessage()
+                    msg["Subject"] = subject
+                    msg["From"] = from_header
+                    msg["To"] = to
+                    msg.set_content(
+                        "Otwórz tę wiadomość w kliencie HTML, albo kliknij link w wersji HTML."
+                    )
+                    msg.add_alternative(html, subtype="html")
+                    server.send_message(msg)
+                    print(f"  ✓ SMTP → {to}")
+                    sent.append({"to": to, "result": {"id": f"smtp:{to}"}})
+                except Exception as exc:
+                    failed.append(f"{to}: {exc}")
+                    print(f"  ! SMTP błąd dla {to}: {exc}")
+    except Exception as exc:
+        raise RuntimeError(f"SMTP Interia nieudane ({host}:{port}): {exc}") from exc
+
+    if not sent:
+        raise RuntimeError("Nie udało się wysłać raportu do żadnego odbiorcy (SMTP). " + " | ".join(failed))
+    if failed:
+        print(f"  ! częściowa wysyłka — pominięto: {', '.join(f.split(':', 1)[0] for f in failed)}")
+    return {"id": sent[0]["result"].get("id"), "provider": "smtp", "sent": sent, "failed": failed}
+
+
+def _send_via_resend(*, to_emails: list[str], subject: str, html: str) -> dict[str, Any]:
+    api_key = cfg.require_env("RESEND_API_KEY")
+    from_email = (
+        cfg.env("REPORT_FROM_EMAIL", "BTC Report <onboarding@resend.dev>")
+        or "BTC Report <onboarding@resend.dev>"
+    )
+    resend.api_key = api_key
+    print("→ wysyłka Resend (brak SMTP_USER/SMTP_PASSWORD)")
     sent: list[dict[str, Any]] = []
     failed: list[str] = []
     for to in to_emails:
@@ -86,7 +160,7 @@ def send_email(
                     "from": from_email,
                     "to": [to],
                     "subject": subject,
-                    "html": cover,
+                    "html": html,
                 }
             )
             rid = result.get("id") if isinstance(result, dict) else None
@@ -97,24 +171,22 @@ def send_email(
             failed.append(f"{to}: {msg}")
             if _is_resend_testing_recipient_block(msg):
                 print(
-                    f"  ! Resend odrzucił {to} (tryb testowy / brak zweryfikowanej domeny). "
-                    "Interia/zweryfikowany adres nadal może dostać maila. "
-                    "Żeby Gmail działał: resend.com/domains + FROM z własnej domeny."
+                    f"  ! Resend odrzucił {to} (tryb testowy). "
+                    "Ustaw SMTP Interii (SMTP_USER + SMTP_PASSWORD), żeby wysyłać też na Gmail."
                 )
             else:
                 print(f"  ! Resend błąd dla {to}: {msg}")
 
     if not sent:
         raise RuntimeError(
-            "Nie udało się wysłać raportu do żadnego odbiorcy. "
-            + " | ".join(failed)
+            "Nie udało się wysłać raportu do żadnego odbiorcy. " + " | ".join(failed)
         )
     if failed:
-        print(f"  ! częściowa wysyłka — pominięto: {'; '.join(f.split(':', 1)[0] for f in failed)}")
-    # kompatybilność wsteczna: id pierwszego udanego
+        print(f"  ! częściowa wysyłka — pominięto: {', '.join(f.split(':', 1)[0] for f in failed)}")
     first = sent[0]["result"] if isinstance(sent[0]["result"], dict) else {}
     return {
         "id": first.get("id") if isinstance(first, dict) else None,
+        "provider": "resend",
         "sent": sent,
         "failed": failed,
     }
@@ -184,7 +256,7 @@ def build_cover_html(
 <html lang="pl">
 <head><meta charset="utf-8" /></head>
 <body style="font-family: Georgia, 'Times New Roman', serif; color:#1a1a1a; line-height:1.5; max-width:560px; margin:24px auto; padding:0 16px">
-  <p>Cześć Paweł,</p>
+  <p>Cześć,</p>
   {body_main}
   <p style="color:#666;font-size:0.95rem">
     To materiał informacyjny, nie rekomendacja inwestycyjna.
