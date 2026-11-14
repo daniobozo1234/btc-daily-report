@@ -111,7 +111,8 @@ def fetch_account_posts(
         if len(text) < 20:
             continue
         published = _parse_rss_date(getattr(entry, "published", None) or getattr(entry, "updated", None))
-        if published and published < cutoff:
+        # bez daty / za stare — odrzucamy (wcześniej undated wpadały do raportu)
+        if not published or published < cutoff:
             continue
         link = getattr(entry, "link", "") or ""
         if not link:
