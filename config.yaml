@@ -27,9 +27,8 @@ rss_crypto_pl:
   - name: BeInCrypto PL
     url: https://pl.beincrypto.com/feed/
     lang: pl
-  - name: Google News PL (krypto)
-    url: https://news.google.com/rss/search?q=bitcoin+OR+kryptowaluty+OR+ethereum+OR+binance+when:3d&hl=pl&gl=PL&ceid=PL:pl
-    lang: pl
+  # Google News usunięty: w RSS podaje „świeżą” datę indeksacji, nie publikacji
+  # (np. artykuł Analizy.pl z 2026-08-25 wracał z datą listopadową).
 
 rss_crypto_en:
   - name: CoinDesk
