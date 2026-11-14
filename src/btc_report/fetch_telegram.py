@@ -99,7 +99,8 @@ def fetch_channel_posts(
             continue
         time_el = msg.select_one("time")
         published = _parse_dt(time_el.get("datetime") if time_el else None)
-        if published and published < cutoff:
+        # bez daty / za stare — nie wpuszczamy (wcześniej undated przechodziły)
+        if not published or published < cutoff:
             continue
         date_a = msg.select_one("a.tgme_widget_message_date")
         link = (date_a.get("href") if date_a else None) or msg.get("data-post")
