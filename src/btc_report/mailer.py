@@ -94,6 +94,10 @@ def send_email(
 
 
 def _smtp_configured() -> bool:
+    # Tymczasowy wyłącznik (np. Interia czeka na aktywację „programu pocztowego”)
+    flag = (cfg.env("SMTP_DISABLED") or "").strip().lower()
+    if flag in ("1", "true", "yes", "on"):
+        return False
     user = (cfg.env("SMTP_USER") or "").strip()
     password = (cfg.env("SMTP_PASSWORD") or "").strip()
     return bool(user and password)
