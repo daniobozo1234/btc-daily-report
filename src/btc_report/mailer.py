@@ -76,7 +76,20 @@ def send_email(
 
     print(f"→ odbiorcy: {', '.join(to_emails)}")
     if _smtp_configured():
-        return _send_via_smtp(to_emails=to_emails, subject=subject, html=cover)
+        try:
+            return _send_via_smtp(to_emails=to_emails, subject=subject, html=cover)
+        except Exception as exc:
+            # Auth/chwilowy pad Interii nie może zabić całego joba (daily+weekly).
+            # Resend i tak dotrze przynajmniej na e-mail konta Resend (Interia).
+            print(f"! SMTP nieudane ({exc}) — próbuję zapas Resend…")
+            try:
+                result = _send_via_resend(to_emails=to_emails, subject=subject, html=cover)
+                result["smtp_error"] = str(exc)
+                return result
+            except Exception as resend_exc:
+                raise RuntimeError(
+                    f"SMTP i Resend nieudane. SMTP: {exc} | Resend: {resend_exc}"
+                ) from resend_exc
     return _send_via_resend(to_emails=to_emails, subject=subject, html=cover)
 
 
