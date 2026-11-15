@@ -219,19 +219,24 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
                 date_stamp=stamp,
                 update_latest=(report_type == "daily"),
             )
-            print(f"→ wysyłka Resend ({report_type})…")
-            result = send_email(
-                subject=subject,
-                html=html,
-                full_report_html=html,
-                full_report_name=report_filename,
-                report_types=[report_type],
-                report_date=generated,
-                report_url=report_url,
-            )
-            provider_id = result.get("id") if isinstance(result, dict) else None
-            store.log_sent([report_type], subject, provider_id)
-            print(f"✓ wysłano: {subject} (id={provider_id})")
+            print(f"→ wysyłka mail ({report_type})…")
+            try:
+                result = send_email(
+                    subject=subject,
+                    html=html,
+                    full_report_html=html,
+                    full_report_name=report_filename,
+                    report_types=[report_type],
+                    report_date=generated,
+                    report_url=report_url,
+                )
+                provider_id = result.get("id") if isinstance(result, dict) else None
+                store.log_sent([report_type], subject, provider_id)
+                print(f"✓ wysłano: {subject} (id={provider_id})")
+            except Exception as exc:
+                # Nie przerywaj weekly/monthly, jeśli daily-mail padł (np. SMTP 535).
+                print(f"! wysyłka {report_type} nieudana: {exc}")
+                print(f"  raport HTML jest online: {report_url or '(brak URL)'}")
         else:
             print(f"✓ raport gotowy (bez wysyłki): {subject}")
 
