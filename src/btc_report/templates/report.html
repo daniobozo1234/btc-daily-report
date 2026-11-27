@@ -143,6 +143,36 @@
     }
     .outlook h3 { margin-top: 0; }
     .outlook p { margin: 0.45rem 0 0.7rem; }
+    table.econ-cal {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      margin: 8px 0 18px;
+    }
+    table.econ-cal th, table.econ-cal td {
+      padding: 10px 11px;
+      text-align: left;
+      border-bottom: 1px solid var(--hairline);
+      vertical-align: top;
+    }
+    table.econ-cal th {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: rgba(0,0,0,0.03);
+    }
+    table.econ-cal tr:last-child td { border-bottom: none; }
+    .impact-high { color: var(--red); font-weight: 600; }
+    .impact-medium { color: var(--orange); font-weight: 600; }
+    .impact-low { color: var(--secondary); font-weight: 500; }
+    .cal-num { white-space: nowrap; font-variant-numeric: tabular-nums; }
     .thread { margin: 0.75rem 0 1.05rem; }
     .thread .label { font-weight: 600; }
     .trend-up { color: var(--green); font-weight: 600; }
@@ -624,7 +654,69 @@
       {% endfor %}
     </ul>
 
-    <h2>Makro / ekonomia</h2>
+    <h2>Kalendarz makroekonomiczny</h2>
+    <p class="muted">Ważne odczyty i decyzje (USA / UE): prognoza rynku oraz wynik po publikacji. Czas: Europe/Warsaw.</p>
+    {% set cal = econ_calendar or {} %}
+    {% if cal.upcoming %}
+    <h3>Nadchodzące</h3>
+    <table class="econ-cal">
+      <thead>
+        <tr>
+          <th>Kiedy</th>
+          <th>Wydarzenie</th>
+          <th>Waga</th>
+          <th>Prognoza</th>
+          <th>Poprzedni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in cal.upcoming %}
+        <tr>
+          <td class="cal-num">{{ e.when_pl }}<br /><span class="muted">{{ e.country }}</span></td>
+          <td><b>{{ e.title_pl or e.title }}</b></td>
+          <td class="{% if e.impact == 'High' %}impact-high{% elif e.impact == 'Medium' %}impact-medium{% else %}impact-low{% endif %}">{{ e.impact }}</td>
+          <td class="cal-num">{{ e.forecast or '—' }}</td>
+          <td class="cal-num">{{ e.previous or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% if cal.past %}
+    <h3>Już opublikowane</h3>
+    <table class="econ-cal">
+      <thead>
+        <tr>
+          <th>Kiedy</th>
+          <th>Wydarzenie</th>
+          <th>Waga</th>
+          <th>Prognoza</th>
+          <th>Poprzedni</th>
+          <th>Wynik</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in cal.past %}
+        <tr>
+          <td class="cal-num">{{ e.when_pl }}<br /><span class="muted">{{ e.country }}</span></td>
+          <td>
+            <b>{{ e.title_pl or e.title }}</b>
+            {% if e.surprise %}<br /><span class="muted">{{ e.surprise }}</span>{% endif %}
+          </td>
+          <td class="{% if e.impact == 'High' %}impact-high{% elif e.impact == 'Medium' %}impact-medium{% else %}impact-low{% endif %}">{{ e.impact }}</td>
+          <td class="cal-num">{{ e.forecast or '—' }}</td>
+          <td class="cal-num">{{ e.previous or '—' }}</td>
+          <td class="cal-num"><b>{{ e.actual or '—' }}</b></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% if not cal.upcoming and not cal.past %}
+    <p class="muted">Brak danych kalendarza makro w tym uruchomieniu.</p>
+    {% endif %}
+
+    <h2>Makro / ekonomia — newsy</h2>
     <ul>
       {% for a in macro %}
       <li>
