@@ -130,6 +130,65 @@ def _parse_when(raw: str | None) -> datetime | None:
         return None
 
 
+def _crypto_priority(ev: EconEvent) -> int:
+    """Niższy = ważniejsze dla krypto (sort rosnąco)."""
+    t = f"{ev.title} {ev.title_pl}".lower()
+    if re.search(r"interest rate decision|fed interest|ecb interest", t):
+        return 0
+    if re.search(r"fomc press|ecb press|fomc economic projections|interest rate projections", t):
+        return 1
+    if re.search(r"\bcpi\b|consumer price|pce price|harmonized index|hicp", t):
+        return 2
+    if re.search(r"nonfarm|nfp|unemployment|adp employment|hourly earnings", t):
+        return 3
+    if re.search(r"gdp growth", t):
+        return 4
+    if re.search(r"ism (manufacturing|services) pmi", t):
+        return 5
+    if re.search(r"jobless claims|jolts|retail sales", t):
+        return 6
+    return 8
+
+
+def _inflation_family(title: str) -> str | None:
+    t = title.lower()
+    if "core" in t and ("cpi" in t or "consumer price" in t or "harmonized" in t or "pce" in t):
+        if "pce" in t:
+            return "core_pce"
+        if "harmonized" in t or "hicp" in t:
+            return "core_hicp"
+        return "core_cpi"
+    if "pce" in t and "price" in t:
+        return "pce"
+    if "harmonized" in t or "hicp" in t:
+        return "hicp"
+    if "cpi" in t or "consumer price" in t:
+        return "cpi"
+    return None
+
+
+def _drop_redundant_inflation_mom(events: list[EconEvent]) -> list[EconEvent]:
+    """Gdy jest YoY i MoM tej samej inflacji tego samego dnia — zostaw YoY."""
+    yoy_keys: set[tuple[str, str, str]] = set()
+    for e in events:
+        fam = _inflation_family(e.title)
+        if not fam or "(yoy)" not in e.title.lower() and "yoy" not in e.title.lower():
+            # also titles like "CPI (YoY)"
+            if fam and re.search(r"\(yoy\)|\byoy\b", e.title, re.I):
+                yoy_keys.add((e.when_utc[:10], e.country, fam))
+            continue
+        yoy_keys.add((e.when_utc[:10], e.country, fam))
+
+    out: list[EconEvent] = []
+    for e in events:
+        fam = _inflation_family(e.title)
+        if fam and re.search(r"\(mom\)|\bmom\b", e.title, re.I):
+            if (e.when_utc[:10], e.country, fam) in yoy_keys:
+                continue
+        out.append(e)
+    return out
+
+
 def _should_keep(raw: dict[str, Any], *, min_impact: str = "medium") -> bool:
     title = (raw.get("title") or "").strip()
     if not title:
@@ -225,15 +284,20 @@ def fetch_econ_calendar(
         seen.add(key)
         events.append(ev)
 
-    past = sorted([e for e in events if e.happened], key=lambda e: e.when_utc, reverse=True)
+    events = _drop_redundant_inflation_mom(events)
+
+    past = sorted(
+        [e for e in events if e.happened],
+        key=lambda e: (_crypto_priority(e), e.when_utc),
+        reverse=True,
+    )
     upcoming = sorted(
         [e for e in events if not e.happened],
-        key=lambda e: ({"High": 0, "Medium": 1, "Low": 2}.get(e.impact, 9), e.when_utc),
+        key=lambda e: (_crypto_priority(e), e.when_utc),
     )
 
-    # więcej miejsca na nadchodzące (kalendarz „co przed nami”)
-    upcoming_cap = max(12, (limit * 2) // 3)
-    past_cap = max(6, limit - upcoming_cap)
+    upcoming_cap = max(10, limit - 4)
+    past_cap = max(4, limit - upcoming_cap)
     upcoming_out = [e.to_dict() for e in upcoming[:upcoming_cap]]
     past_out = [e.to_dict() for e in past[:past_cap]]
 
