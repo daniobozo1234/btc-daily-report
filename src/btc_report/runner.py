@@ -10,6 +10,7 @@ from btc_report import store
 from btc_report.analyze import analyze, analyze_period, build_brief, merge_enriched_articles
 from btc_report.charts import render_etf_bars, render_whale_netflow
 from btc_report.fetch_articles import enrich_with_excerpts
+from btc_report.fetch_econ_calendar import fetch_econ_calendar
 from btc_report.fetch_forum import fetch_forum_threads
 from btc_report.fetch_market import collect_market
 from btc_report.fetch_news import collect_articles
@@ -36,6 +37,24 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
 
     print("→ pobieram ruchy wielorybów / netflow giełd…")
     whales = fetch_whale_flows().to_dict()
+
+    print("→ pobieram kalendarz makroekonomiczny…")
+    econ_calendar: dict = {}
+    cal_cfg = config.get("econ_calendar") or {}
+    if cal_cfg.get("enabled", True):
+        try:
+            econ_calendar = fetch_econ_calendar(
+                countries=list(cal_cfg.get("countries") or ["US", "EU"]),
+                days_back=int(cal_cfg.get("days_back") or 3),
+                days_ahead=int(cal_cfg.get("days_ahead") or 10),
+                min_impact=str(cal_cfg.get("min_impact") or "medium"),
+                limit=int(cal_cfg.get("limit") or 28),
+            )
+        except Exception as exc:
+            print(f"! kalendarz makro pominięty: {exc}")
+            econ_calendar = {"upcoming": [], "past": [], "error": str(exc)}
+    else:
+        print("  · kalendarz makro wyłączony w config.yaml")
 
     print("→ pobieram RSS…")
     articles_obj = collect_articles(config)
@@ -148,6 +167,7 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
                 period_history=period_history,
                 telegram=telegram,
                 x_posts=x_posts,
+                econ_calendar=econ_calendar,
             )
             analysis = analyze(brief, shared_news=shared_news)
             articles = merge_enriched_articles(articles_raw, analysis)
@@ -171,6 +191,7 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
                 period_context=period_context,
                 telegram=[],
                 x_posts=[],
+                econ_calendar=econ_calendar,
             )
             analysis = analyze_period(brief)
             articles = {"crypto_pl": [], "crypto_en": [], "macro": []}
@@ -197,6 +218,7 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
             generated_at=generated_at,
             period=period_meta,
             period_context=period_context,
+            econ_calendar=econ_calendar,
         )
         subject = subject_line([report_type], generated, market)
         day = generated.strftime("%Y%m%d")
