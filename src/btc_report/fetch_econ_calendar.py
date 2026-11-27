@@ -11,15 +11,39 @@ from btc_report.http_client import get_json
 WARSAW = ZoneInfo("Europe/Warsaw")
 HELIOS_URL = "https://api.helious.io/v1/calendar"
 
-# Typy, które zostawiamy (bez earnings / wakacji / aukcji T-bill)
-_KEEP_TYPES = {"economic", "fed_speech", "central_bank", "speech"}
-_SKIP_TITLE_RE = (
-    "auction",
-    "earnings",
-    "bill auction",
-    "holiday",
-    "bank holiday",
-    "thanksgiving",
+import re
+
+# Tylko wydarzenia, które realnie ruszają risk-on / krypto (stopy, inflacja, praca, PKB, główne PMI)
+_CRYPTO_RELEVANT = re.compile(
+    r"("
+    r"fed interest rate|fomc (press|economic|meeting|minutes)|interest rate decision|"
+    r"interest rate projections|ecb interest|ecb press|ecb monetary policy statement|"
+    r"consumer price index|core cpi|pce price|core pce|"
+    r"harmonized index of consumer prices|core harmonized|"
+    r"nonfarm payrolls|unemployment rate|"
+    r"average hourly earnings|"
+    r"adp employment|"
+    r"initial jobless claims|"
+    r"jolts job openings|"
+    r"gdp growth|"
+    r"ism manufacturing pmi$|ism services pmi$|"
+    r"retail sales \(mom\)|retail sales \(yoy\)|"
+    r"^retail sales$"
+    r")",
+    re.IGNORECASE,
+)
+_SKIP_NOISE = re.compile(
+    r"("
+    r"auction|earnings|holiday|thanksgiving|summit|speech|"
+    r"meeting accounts|beige book|"
+    r"employment index|new orders|prices paid|"
+    r"challenger|factory orders|productivity|unit labor|"
+    r"michigan consumer expectations|uom 1-year|uom 5-year|"
+    r"labor force participation|u6 underemployment|"
+    r"business climate|chicago pmi|"
+    r"4-week average"
+    r")",
+    re.IGNORECASE,
 )
 
 # Krótkie PL dla najczęstszych pozycji (reszta zostaje EN)
@@ -108,21 +132,18 @@ def _parse_when(raw: str | None) -> datetime | None:
 
 def _should_keep(raw: dict[str, Any], *, min_impact: str = "medium") -> bool:
     title = (raw.get("title") or "").strip()
-    low = title.lower()
-    if any(x in low for x in _SKIP_TITLE_RE):
+    if not title:
         return False
-    etype = (raw.get("type") or "economic").strip().lower()
-    if etype not in _KEEP_TYPES and "rate" not in low and "fomc" not in low and "ecb" not in low:
-        # pozwól na type=economic-like aliases
-        if etype not in ("economic",):
-            return False
+    if _SKIP_NOISE.search(title) and not re.search(
+        r"fomc press|ecb press|interest rate decision|fed interest", title, re.I
+    ):
+        return False
+    if not _CRYPTO_RELEVANT.search(title):
+        return False
     impact = (raw.get("impact") or "Low").strip().title()
     order = {"Low": 0, "Holiday": 0, "Medium": 1, "High": 2}
     need = {"low": 0, "medium": 1, "high": 2}.get(min_impact.lower(), 1)
     if order.get(impact, 0) < need:
-        return False
-    # High zawsze; Medium tylko economic / speech / central bank
-    if impact == "Medium" and etype not in _KEEP_TYPES and "fomc" not in low and "ecb" not in low:
         return False
     return True
 
