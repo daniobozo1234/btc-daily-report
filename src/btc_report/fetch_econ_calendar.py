@@ -17,7 +17,7 @@ import re
 _CRYPTO_RELEVANT = re.compile(
     r"("
     r"fed interest rate|fomc (press|economic|meeting|minutes)|interest rate decision|"
-    r"interest rate projections|ecb interest|ecb press|ecb monetary policy statement|"
+    r"ecb interest|ecb press|ecb monetary policy statement|"
     r"consumer price index|core cpi|pce price|core pce|"
     r"harmonized index of consumer prices|core harmonized|"
     r"nonfarm payrolls|unemployment rate|"
@@ -41,7 +41,8 @@ _SKIP_NOISE = re.compile(
     r"michigan consumer expectations|uom 1-year|uom 5-year|"
     r"labor force participation|u6 underemployment|"
     r"business climate|chicago pmi|"
-    r"4-week average"
+    r"4-week average|"
+    r"interest rate projections\s*-"  # zostawiamy zbiorcze FOMC Economic Projections
     r")",
     re.IGNORECASE,
 )
