@@ -100,10 +100,12 @@ def render_html(
     period_context: dict[str, Any] | None = None,
     telegram_block: dict[str, Any] | None = None,
     x_block: dict[str, Any] | None = None,
+    econ_calendar: dict[str, Any] | None = None,
 ) -> str:
     titles = " + ".join(LABELS.get(t, t) for t in report_types)
     period = period or {}
     period_context = period_context or {}
+    cal = econ_calendar or {}
     tmpl = _env().get_template("report.html")
     return tmpl.render(
         titles=titles,
@@ -115,6 +117,7 @@ def render_html(
         crypto_pl=articles.get("crypto_pl", []),
         crypto_en=articles.get("crypto_en", []),
         macro=articles.get("macro", []),
+        econ_calendar=cal,
         forum_block=forum_block,
         telegram_block=telegram_block or analysis.get("telegram") or {},
         x_block=x_block or analysis.get("x_twitter") or {},
