@@ -22,7 +22,7 @@ econ_calendar:
   days_back: 3
   days_ahead: 10
   min_impact: medium
-  limit: 14
+  limit: 12
 
 # Tylko świeże, stricte krypto / agregatory z filtrem słów kluczowych.
 # Usunięte martwe/off-topic: Kryptowaluty.info.pl, KryptoEkonomia, Money.pl „krypto”, FXMAG, Comparic ogólny.
