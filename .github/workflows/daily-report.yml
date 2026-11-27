@@ -3,7 +3,7 @@ on:
   schedule:
     # 05:45 UTC ≈ 06:45 Europe/Warsaw (czas zimowy CET);
     # w czasie letnim (CEST) wyjdzie ~07:45
-    - cron: "45 5 * * *"
+    - cron: "45 4 * * *"
   workflow_dispatch:
 jobs:
   report:
