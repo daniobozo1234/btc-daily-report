@@ -15,14 +15,14 @@ limits:
   # odrzucaj artykuły starsze niż N dni (i bez daty) — koniec „newsy z 2024”
   max_article_age_days: 4
 
-# Kalendarz makro (Fed, CPI, NFP, EBC…) — prognoza + wynik po publikacji
+# Kalendarz makro pod krypto: stopy Fed/EBC, inflacja, praca, PKB, główne PMI
 econ_calendar:
   enabled: true
   countries: [US, EU]
   days_back: 3
   days_ahead: 10
   min_impact: medium
-  limit: 28
+  limit: 14
 
 # Tylko świeże, stricte krypto / agregatory z filtrem słów kluczowych.
 # Usunięte martwe/off-topic: Kryptowaluty.info.pl, KryptoEkonomia, Money.pl „krypto”, FXMAG, Comparic ogólny.
