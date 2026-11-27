@@ -175,15 +175,22 @@ def build_brief(
     period_context: dict[str, Any] | None = None,
     telegram: list[dict] | None = None,
     x_posts: list[dict] | None = None,
+    econ_calendar: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     whales = whales or {}
     telegram = telegram or []
     x_posts = x_posts or []
+    cal = econ_calendar or {}
     return {
         "report_types": report_types,
         "period": period or {},
         "period_history": period_history or {},
         "period_context": period_context or {},
+        "econ_calendar": {
+            "upcoming": (cal.get("upcoming") or [])[:12],
+            "past": (cal.get("past") or [])[:8],
+            "source": cal.get("source"),
+        },
         "market": {
             k: market.get(k)
             for k in (
@@ -545,6 +552,32 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
             }
             for a in (news_macro.get("macro") or [])[:3]
         ],
+        "kalendarz_makro": {
+            "nadchodzace": [
+                {
+                    "kiedy": e.get("when_pl"),
+                    "tytul": e.get("title_pl") or e.get("title"),
+                    "kraj": e.get("country"),
+                    "waga": e.get("impact"),
+                    "prognoza": e.get("forecast"),
+                    "poprzedni": e.get("previous"),
+                }
+                for e in ((brief.get("econ_calendar") or {}).get("upcoming") or [])[:8]
+            ],
+            "minione": [
+                {
+                    "kiedy": e.get("when_pl"),
+                    "tytul": e.get("title_pl") or e.get("title"),
+                    "kraj": e.get("country"),
+                    "waga": e.get("impact"),
+                    "prognoza": e.get("forecast"),
+                    "poprzedni": e.get("previous"),
+                    "wynik": e.get("actual"),
+                    "niespodzianka": e.get("surprise"),
+                }
+                for e in ((brief.get("econ_calendar") or {}).get("past") or [])[:6]
+            ],
+        },
         "forum": {
             "overall": ((forum.get("overall") or "")[:280]),
             "hot_topics": (forum.get("hot_topics") or [])[:4],
@@ -585,7 +618,8 @@ def analyze(brief: dict[str, Any], *, shared_news: dict[str, Any] | None = None)
         + period_focus
         + " Każde pole = 3-4 krótkie zdania (nie więcej). Schema: "
         '{"makro_a_btc":"...","wieloryby":"...","obraz_rynku":"..."}',
-        "Opisz makro vs BTC, netflow/wieloryby i obraz rynku w skali tego okresu:\n" + ctx_json,
+        "Opisz makro vs BTC (uwzględnij kalendarz_makro: nadchodzące decyzje/odczyty i świeże wyniki vs prognoza), "
+        "netflow/wieloryby i obraz rynku w skali tego okresu:\n" + ctx_json,
     )
     part3 = _outlook_part(
         f"AI outlook 3/3 — scenariusze i wnioski ({primary})",
