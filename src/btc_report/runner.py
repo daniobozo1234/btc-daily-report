@@ -22,6 +22,7 @@ from btc_report.mailer import send_email, subject_line
 from btc_report.periods import LABELS, detect_report_types, now_local, window_for
 from btc_report.publish import publish_report_html
 from btc_report.render import render_html
+from btc_report.run_guard import already_sent_successfully_today
 
 
 def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int:
@@ -30,6 +31,10 @@ def build_report(report_types: list[str], *, send: bool, save_html: bool) -> int
     cfg.ensure_dirs()
     tz = config.get("timezone") or "Europe/Warsaw"
     generated = now_local(tz)
+
+    if send and already_sent_successfully_today(tz_name=tz):
+        print("✓ pomijam cały pipeline — raport/mail na dziś już poszedł (anti-duplikat)")
+        return 0
 
     print("→ pobieram rynek…")
     market = collect_market().to_dict()
